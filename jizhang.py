@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """简单记账小脚本
 
-用法：
-    python3 jizhang.py add 金额 [备注]   记一笔账，例如: python3 jizhang.py add 25.5 午饭
+推荐用法（交互模式）：
+    python3 jizhang.py        进入记账模式，然后直接输入“金额 备注”记账，
+                              例如输入: 30 晚饭
+                              输入 list 看全部，today 看今天，total 看总计，q 退出
+
+也支持单条命令：
+    python3 jizhang.py add 金额 [备注]   记一笔账
     python3 jizhang.py list             查看所有账目
     python3 jizhang.py today            查看今天花了多少钱
     python3 jizhang.py total            查看总共花了多少钱
@@ -72,9 +77,48 @@ def show_total():
     print(f"总共花了 {sum(r['amount'] for r in records):.2f} 元，共 {len(records)} 笔")
 
 
+def interactive():
+    """交互记账模式：进来之后一行记一笔，不用每次敲 python3 jizhang.py"""
+    print("=" * 40)
+    print("  欢迎使用记账小助手！")
+    print("  直接输入“金额 备注”记一笔，例如: 30 晚饭")
+    print("  list(全部)  today(今天)  total(总计)  q(退出)")
+    print("=" * 40)
+    while True:
+        try:
+            line = input("\n记账> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见！")
+            break
+        if not line:
+            continue
+        if line in ("q", "quit", "exit", "退出"):
+            print("再见，明天也记得来记账哦！")
+            break
+        if line in ("list", "全部"):
+            show_list()
+        elif line in ("today", "今天"):
+            show_today()
+        elif line in ("total", "总计"):
+            show_total()
+        elif line in ("help", "帮助", "?"):
+            print("输入“金额 备注”记账，如: 30 晚饭")
+            print("list 看全部 / today 看今天 / total 看总计 / q 退出")
+        else:
+            parts = line.split(maxsplit=1)
+            try:
+                amount = float(parts[0])
+            except ValueError:
+                print(f"没看懂：{line}")
+                print("记账请输入“金额 备注”，例如: 30 晚饭（输入 help 看说明）")
+                continue
+            note = parts[1] if len(parts) > 1 else ""
+            add(amount, note)
+
+
 def main():
     if len(sys.argv) < 2:
-        print(__doc__)
+        interactive()
         return
 
     command = sys.argv[1]
