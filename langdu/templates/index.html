@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>朗读文档</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    background: linear-gradient(160deg, #eef3fb 0%, #f7f5ef 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+    color: #2b3145;
+  }
+  .card {
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(60, 80, 130, 0.12);
+    width: 100%;
+    max-width: 680px;
+    padding: 36px;
+  }
+  h1 { font-size: 26px; margin-bottom: 6px; }
+  .subtitle { color: #8a90a3; font-size: 14px; margin-bottom: 26px; }
+
+  .drop {
+    border: 2px dashed #b9c4dd;
+    border-radius: 14px;
+    padding: 34px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    color: #6b7390;
+  }
+  .drop:hover, .drop.over { border-color: #4f7cf0; background: #f3f7ff; }
+  .drop .big { font-size: 17px; color: #3c4566; margin-bottom: 6px; }
+  .drop .small { font-size: 13px; }
+  #fileInput { display: none; }
+
+  .filename {
+    margin-top: 12px; font-size: 14px; color: #4f7cf0;
+    display: none; word-break: break-all;
+  }
+
+  .section { margin-top: 26px; }
+  .label { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+
+  .voices { display: flex; gap: 14px; }
+  .voice {
+    flex: 1;
+    border: 2px solid #e3e7f2;
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    user-select: none;
+  }
+  .voice .icon { font-size: 30px; }
+  .voice .name { font-size: 16px; font-weight: 600; margin-top: 6px; }
+  .voice .desc { font-size: 12px; color: #8a90a3; margin-top: 4px; }
+  .voice.active { border-color: #4f7cf0; background: #f3f7ff; }
+
+  .speedRow { display: flex; align-items: center; gap: 14px; }
+  input[type=range] { flex: 1; accent-color: #4f7cf0; }
+  .speedVal { width: 56px; text-align: right; font-size: 14px; color: #4f7cf0; font-weight: 600; }
+
+  textarea {
+    width: 100%; height: 180px; resize: vertical;
+    border: 1.5px solid #e3e7f2; border-radius: 12px;
+    padding: 14px; font-size: 14px; line-height: 1.7;
+    color: #2b3145; outline: none; display: none;
+  }
+  textarea:focus { border-color: #4f7cf0; }
+  .charCount { font-size: 12px; color: #8a90a3; margin-top: 6px; display: none; }
+
+  .btn {
+    width: 100%; margin-top: 26px;
+    background: linear-gradient(135deg, #4f7cf0, #6b5ef0);
+    color: #fff; border: none; border-radius: 14px;
+    padding: 16px; font-size: 17px; font-weight: 600;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .btn:hover { opacity: .92; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .status { margin-top: 14px; font-size: 14px; text-align: center; display: none; }
+  .status.info { color: #4f7cf0; display: block; }
+  .status.error { color: #e05656; display: block; }
+
+  audio { width: 100%; margin-top: 18px; display: none; }
+  .download {
+    display: none; text-align: center; margin-top: 10px;
+    font-size: 14px; color: #4f7cf0; text-decoration: none;
+  }
+  .download:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📖 朗读文档</h1>
+  <div class="subtitle">上传 Word / TXT / Markdown 文档，选个喜欢的声音，听它为你朗读</div>
+
+  <div class="drop" id="drop">
+    <div class="big">点击选择文档，或把文件拖到这里</div>
+    <div class="small">支持 .docx、.txt、.md，最大 20MB</div>
+    <div class="filename" id="filename"></div>
+  </div>
+  <input type="file" id="fileInput" accept=".docx,.txt,.md,.markdown">
+
+  <div class="section">
+    <div class="label">选择声音</div>
+    <div class="voices">
+      <div class="voice active" data-voice="female">
+        <div class="icon">👩</div>
+        <div class="name">女声 · 晓晓</div>
+        <div class="desc">温暖亲切，娓娓道来</div>
+      </div>
+      <div class="voice" data-voice="male">
+        <div class="icon">👨</div>
+        <div class="name">男声 · 云希</div>
+        <div class="desc">沉稳自然，干净清爽</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="label">语速</div>
+    <div class="speedRow">
+      <span style="font-size:13px;color:#8a90a3">慢</span>
+      <input type="range" id="speed" min="-50" max="50" step="10" value="0">
+      <span style="font-size:13px;color:#8a90a3">快</span>
+      <span class="speedVal" id="speedVal">原速</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="label" id="textLabel" style="display:none">文档内容（可以修改后再朗读）</div>
+    <textarea id="text" placeholder="上传文档后，文字会显示在这里"></textarea>
+    <div class="charCount" id="charCount"></div>
+  </div>
+
+  <button class="btn" id="readBtn" disabled>🔊 开始朗读</button>
+  <div class="status" id="status"></div>
+  <audio id="player" controls></audio>
+  <a class="download" id="download" download="朗读.mp3">⬇️ 下载 MP3 音频</a>
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const filenameEl = document.getElementById('filename');
+const textEl = document.getElementById('text');
+const textLabel = document.getElementById('textLabel');
+const charCount = document.getElementById('charCount');
+const readBtn = document.getElementById('readBtn');
+const statusEl = document.getElementById('status');
+const player = document.getElementById('player');
+const downloadEl = document.getElementById('download');
+const speedEl = document.getElementById('speed');
+const speedVal = document.getElementById('speedVal');
+
+let voice = 'female';
+
+// 声音选择
+document.querySelectorAll('.voice').forEach(el => {
+  el.onclick = () => {
+    document.querySelectorAll('.voice').forEach(v => v.classList.remove('active'));
+    el.classList.add('active');
+    voice = el.dataset.voice;
+  };
+});
+
+// 语速显示
+speedEl.oninput = () => {
+  const v = parseInt(speedEl.value);
+  speedVal.textContent = v === 0 ? '原速' : (v > 0 ? '+' + v + '%' : v + '%');
+};
+
+// 文件选择与拖拽
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => {
+  e.preventDefault();
+  drop.classList.remove('over');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+};
+fileInput.onchange = () => { if (fileInput.files.length) handleFile(fileInput.files[0]); };
+
+function setStatus(msg, type) {
+  statusEl.textContent = msg || '';
+  statusEl.className = 'status' + (type ? ' ' + type : '');
+}
+
+async function handleFile(file) {
+  filenameEl.textContent = '📄 ' + file.name;
+  filenameEl.style.display = 'block';
+  setStatus('正在读取文档…', 'info');
+  readBtn.disabled = true;
+
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const resp = await fetch('/api/extract', { method: 'POST', body: form });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '读取失败');
+    textEl.value = data.text;
+    textEl.style.display = 'block';
+    textLabel.style.display = 'block';
+    charCount.style.display = 'block';
+    charCount.textContent = '共 ' + data.chars + ' 个字';
+    readBtn.disabled = false;
+    setStatus('文档读取成功，点击下面的按钮开始朗读', 'info');
+  } catch (err) {
+    setStatus('❌ ' + err.message, 'error');
+  }
+}
+
+readBtn.onclick = async () => {
+  const text = textEl.value.trim();
+  if (!text) { setStatus('❌ 没有可朗读的文字', 'error'); return; }
+
+  readBtn.disabled = true;
+  player.style.display = 'none';
+  downloadEl.style.display = 'none';
+  setStatus('正在生成语音，文档越长等待越久，请稍候…', 'info');
+
+  try {
+    const resp = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, voice: voice, speed: parseInt(speedEl.value) })
+    });
+    if (!resp.ok) {
+      const data = await resp.json();
+      throw new Error(data.error || '语音合成失败');
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    player.src = url;
+    player.style.display = 'block';
+    downloadEl.href = url;
+    downloadEl.style.display = 'block';
+    setStatus('✅ 语音生成完毕，正在播放', 'info');
+    player.play();
+  } catch (err) {
+    setStatus('❌ ' + err.message, 'error');
+  } finally {
+    readBtn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
