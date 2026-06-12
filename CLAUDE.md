@@ -5,7 +5,8 @@
 ## 我的电脑环境
 
 - 苹果 MacBook（M2 芯片），macOS 系统
-- **已经安装好 Python 3**，不需要再教我安装 Python
+- **已经安装好 Python 3.14.3**，不需要再教我安装 Python
+- 终端里用 `python3` 和 `pip3` 命令
 - 终端用的是 macOS 自带的"终端"（Terminal）
 
 ## 和我沟通的方式
