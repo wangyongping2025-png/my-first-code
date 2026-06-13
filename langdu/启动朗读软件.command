@@ -17,10 +17,10 @@ if ! python3 -c "import flask, edge_tts, docx" 2>/dev/null; then
   echo ""
 fi
 
-# 2 秒后自动用默认浏览器打开界面
-( sleep 2 && open "http://127.0.0.1:5000" ) &
+# 4 秒后自动用默认浏览器打开界面（留出程序启动的时间）
+( sleep 4 && open "http://127.0.0.1:8000" ) &
 
-echo "软件启动中…浏览器会自动打开 http://127.0.0.1:5000"
+echo "软件启动中…浏览器会自动打开 http://127.0.0.1:8000"
 echo "用完后，回到这个窗口按 Control + C 即可关闭软件。"
 echo ""
 

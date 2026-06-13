@@ -10,8 +10,10 @@
 运行方法（macOS）：
     pip3 install -r requirements.txt
     python3 app.py
-然后用浏览器打开 http://127.0.0.1:5000
+然后用浏览器打开 http://127.0.0.1:8000
 （更简单的办法：直接双击「启动朗读软件.command」）
+
+说明：端口用 8000，避开 macOS「隔空播放接收器」默认占用的 5000 端口。
 """
 
 import asyncio
@@ -159,6 +161,6 @@ def api_tts():
 
 
 if __name__ == "__main__":
-    print("朗读文档小软件已启动，请用浏览器打开 http://127.0.0.1:5000")
+    print("朗读文档小软件已启动，请用浏览器打开 http://127.0.0.1:8000")
     print("（按 Control + C 可以停止软件）")
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    app.run(host="127.0.0.1", port=8000, debug=False)

@@ -35,7 +35,7 @@ pip3 install -r requirements.txt
 python3 app.py
 ```
 
-看到提示后，浏览器打开 http://127.0.0.1:5000 即可使用。
+看到提示后，浏览器打开 http://127.0.0.1:8000 即可使用。
 
 ## 用完之后
 
