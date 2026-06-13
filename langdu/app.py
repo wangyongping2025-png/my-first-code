@@ -110,6 +110,15 @@ def index():
     return render_template("index.html", voices=VOICES, default_voice=DEFAULT_VOICE)
 
 
+@app.route("/sw.js")
+def service_worker():
+    """从根路径提供 Service Worker，让它的作用范围覆盖整个站点。"""
+    resp = app.send_static_file("sw.js")
+    resp.headers["Content-Type"] = "application/javascript"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 @app.route("/api/extract", methods=["POST"])
 def api_extract():
     """上传文档，返回提取出来的文字。"""

@@ -1,0 +1,16 @@
+{
+  "name": "朗读文档",
+  "short_name": "朗读文档",
+  "description": "上传 Word/TXT/Markdown 文档，富有感情地朗读",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef3fb",
+  "theme_color": "#4f7cf0",
+  "icons": [
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -2,8 +2,19 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>朗读文档</title>
+
+<!-- PWA：让网页可以“添加到主屏幕”，全屏像 App 一样打开 -->
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#4f7cf0">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32">
+<!-- iPhone / iPad 专用 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="朗读文档">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -395,6 +406,14 @@ stopBtn.onclick = () => {
 
 player.onplay = updateButtons;
 player.onpause = updateButtons;
+
+// 注册 Service Worker（让它能“添加到主屏幕”、二次打开更快）
+// 仅在安全环境（https 或 localhost）下生效；局域网 http 会自动跳过，不影响使用
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
