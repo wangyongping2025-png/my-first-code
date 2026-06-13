@@ -2,14 +2,16 @@
 """朗读文档小软件
 
 上传 Word（.docx）、TXT 或 Markdown（.md）文档，
-选择男声或女声，用自然流畅的普通话朗读出来。
+选择喜欢的普通话声音，用自然流畅、富有感情的声音朗读出来。
+支持长文档自动分段、逐段朗读、暂停/继续、从任意一段开始。
 
 语音引擎：微软 Edge 神经网络语音（edge-tts），免费、音质自然、有情感起伏。
 
-运行方法：
-    pip install -r requirements.txt
-    python app.py
+运行方法（macOS）：
+    pip3 install -r requirements.txt
+    python3 app.py
 然后用浏览器打开 http://127.0.0.1:5000
+（更简单的办法：直接双击「启动朗读软件.command」）
 """
 
 import asyncio
@@ -23,11 +25,16 @@ from flask import Flask, jsonify, render_template, request, send_file
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 最大 20MB
 
-# 两个最自然、最有感情的普通话声音
+# 可选的普通话声音（都是自然有感情的神经网络语音）
 VOICES = {
-    "female": "zh-CN-XiaoxiaoNeural",  # 女声：晓晓，活泼温暖
-    "male": "zh-CN-YunxiNeural",       # 男声：云希，阳光自然
+    "zh-CN-XiaoxiaoNeural": {"name": "晓晓", "gender": "女声", "desc": "温暖亲切 · 通用", "emoji": "👩"},
+    "zh-CN-XiaoyiNeural":   {"name": "晓伊", "gender": "女声", "desc": "活泼灵动 · 适合故事", "emoji": "👧"},
+    "zh-CN-YunxiNeural":    {"name": "云希", "gender": "男声", "desc": "自然清爽 · 通用", "emoji": "👨"},
+    "zh-CN-YunjianNeural":  {"name": "云健", "gender": "男声", "desc": "浑厚稳重 · 大气", "emoji": "🧔"},
+    "zh-CN-YunyangNeural":  {"name": "云扬", "gender": "男声", "desc": "专业播报 · 新闻感", "emoji": "📻"},
+    "zh-CN-YunxiaNeural":   {"name": "云夏", "gender": "男声", "desc": "少年清亮 · 讲故事", "emoji": "🧒"},
 }
+DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
 
 
 # ---------- 文档解析 ----------
@@ -98,7 +105,7 @@ async def synthesize(text: str, voice: str, rate: str) -> bytes:
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", voices=VOICES, default_voice=DEFAULT_VOICE)
 
 
 @app.route("/api/extract", methods=["POST"])
@@ -120,13 +127,15 @@ def api_extract():
 
 @app.route("/api/tts", methods=["POST"])
 def api_tts():
-    """把文字合成为语音，返回 MP3。"""
+    """把一段文字合成为语音，返回 MP3。"""
     payload = request.get_json(silent=True) or {}
     text = (payload.get("text") or "").strip()
     if not text:
         return jsonify({"error": "没有可朗读的文字"}), 400
 
-    voice = VOICES.get(payload.get("voice"), VOICES["female"])
+    voice = payload.get("voice")
+    if voice not in VOICES:
+        voice = DEFAULT_VOICE
 
     # 语速：-50 ~ +50（百分比），默认原速
     try:
@@ -151,4 +160,5 @@ def api_tts():
 
 if __name__ == "__main__":
     print("朗读文档小软件已启动，请用浏览器打开 http://127.0.0.1:5000")
+    print("（按 Control + C 可以停止软件）")
     app.run(host="127.0.0.1", port=5000, debug=False)

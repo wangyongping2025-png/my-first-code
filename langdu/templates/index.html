@@ -20,7 +20,7 @@
     border-radius: 18px;
     box-shadow: 0 10px 40px rgba(60, 80, 130, 0.12);
     width: 100%;
-    max-width: 680px;
+    max-width: 720px;
     padding: 36px;
   }
   h1 { font-size: 26px; margin-bottom: 6px; }
@@ -29,7 +29,7 @@
   .drop {
     border: 2px dashed #b9c4dd;
     border-radius: 14px;
-    padding: 34px 20px;
+    padding: 30px 20px;
     text-align: center;
     cursor: pointer;
     transition: all .2s;
@@ -48,20 +48,20 @@
   .section { margin-top: 26px; }
   .label { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
 
-  .voices { display: flex; gap: 14px; }
+  .voices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .voice {
-    flex: 1;
     border: 2px solid #e3e7f2;
-    border-radius: 14px;
-    padding: 16px;
+    border-radius: 12px;
+    padding: 12px;
     text-align: center;
     cursor: pointer;
     transition: all .15s;
     user-select: none;
   }
-  .voice .icon { font-size: 30px; }
-  .voice .name { font-size: 16px; font-weight: 600; margin-top: 6px; }
-  .voice .desc { font-size: 12px; color: #8a90a3; margin-top: 4px; }
+  .voice .icon { font-size: 26px; }
+  .voice .name { font-size: 15px; font-weight: 600; margin-top: 4px; }
+  .voice .gender { font-size: 11px; color: #4f7cf0; margin-top: 2px; }
+  .voice .desc { font-size: 11px; color: #8a90a3; margin-top: 3px; }
   .voice.active { border-color: #4f7cf0; background: #f3f7ff; }
 
   .speedRow { display: flex; align-items: center; gap: 14px; }
@@ -69,7 +69,7 @@
   .speedVal { width: 56px; text-align: right; font-size: 14px; color: #4f7cf0; font-weight: 600; }
 
   textarea {
-    width: 100%; height: 180px; resize: vertical;
+    width: 100%; height: 150px; resize: vertical;
     border: 1.5px solid #e3e7f2; border-radius: 12px;
     padding: 14px; font-size: 14px; line-height: 1.7;
     color: #2b3145; outline: none; display: none;
@@ -77,32 +77,47 @@
   textarea:focus { border-color: #4f7cf0; }
   .charCount { font-size: 12px; color: #8a90a3; margin-top: 6px; display: none; }
 
+  .btnRow { display: flex; gap: 12px; margin-top: 26px; }
   .btn {
-    width: 100%; margin-top: 26px;
+    flex: 1;
     background: linear-gradient(135deg, #4f7cf0, #6b5ef0);
     color: #fff; border: none; border-radius: 14px;
-    padding: 16px; font-size: 17px; font-weight: 600;
+    padding: 15px; font-size: 16px; font-weight: 600;
     cursor: pointer; transition: opacity .15s;
   }
   .btn:hover { opacity: .92; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.secondary {
+    background: #eef1f8; color: #4f5670; flex: 0 0 auto; padding: 15px 18px;
+  }
 
   .status { margin-top: 14px; font-size: 14px; text-align: center; display: none; }
   .status.info { color: #4f7cf0; display: block; }
   .status.error { color: #e05656; display: block; }
 
-  audio { width: 100%; margin-top: 18px; display: none; }
-  .download {
-    display: none; text-align: center; margin-top: 10px;
-    font-size: 14px; color: #4f7cf0; text-decoration: none;
+  audio { width: 100%; margin-top: 16px; display: none; }
+
+  .segments {
+    margin-top: 18px; max-height: 260px; overflow-y: auto;
+    border: 1.5px solid #eef1f8; border-radius: 12px; padding: 6px;
+    display: none;
   }
-  .download:hover { text-decoration: underline; }
+  .seg {
+    padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 1.6;
+    cursor: pointer; transition: background .12s; color: #4f5670;
+    display: flex; gap: 10px;
+  }
+  .seg:hover { background: #f3f7ff; }
+  .seg .num { color: #b9c0d4; font-size: 12px; flex: 0 0 28px; padding-top: 2px; }
+  .seg.playing { background: #eaf1ff; color: #2b3145; }
+  .seg.playing .num { color: #4f7cf0; font-weight: 700; }
+  .seg.done { color: #aab0c2; }
 </style>
 </head>
 <body>
 <div class="card">
   <h1>📖 朗读文档</h1>
-  <div class="subtitle">上传 Word / TXT / Markdown 文档，选个喜欢的声音，听它为你朗读</div>
+  <div class="subtitle">上传 Word / TXT / Markdown 文档，选个喜欢的声音，听它富有感情地为你朗读</div>
 
   <div class="drop" id="drop">
     <div class="big">点击选择文档，或把文件拖到这里</div>
@@ -113,17 +128,15 @@
 
   <div class="section">
     <div class="label">选择声音</div>
-    <div class="voices">
-      <div class="voice active" data-voice="female">
-        <div class="icon">👩</div>
-        <div class="name">女声 · 晓晓</div>
-        <div class="desc">温暖亲切，娓娓道来</div>
+    <div class="voices" id="voices">
+      {% for vid, v in voices.items() %}
+      <div class="voice {% if vid == default_voice %}active{% endif %}" data-voice="{{ vid }}">
+        <div class="icon">{{ v.emoji }}</div>
+        <div class="name">{{ v.name }}</div>
+        <div class="gender">{{ v.gender }}</div>
+        <div class="desc">{{ v.desc }}</div>
       </div>
-      <div class="voice" data-voice="male">
-        <div class="icon">👨</div>
-        <div class="name">男声 · 云希</div>
-        <div class="desc">沉稳自然，干净清爽</div>
-      </div>
+      {% endfor %}
     </div>
   </div>
 
@@ -143,10 +156,16 @@
     <div class="charCount" id="charCount"></div>
   </div>
 
-  <button class="btn" id="readBtn" disabled>🔊 开始朗读</button>
+  <div class="btnRow">
+    <button class="btn" id="playBtn" disabled>🔊 开始朗读</button>
+    <button class="btn secondary" id="pauseBtn" disabled>⏸ 暂停</button>
+    <button class="btn secondary" id="stopBtn" disabled>⏹ 停止</button>
+  </div>
+
   <div class="status" id="status"></div>
   <audio id="player" controls></audio>
-  <a class="download" id="download" download="朗读.mp3">⬇️ 下载 MP3 音频</a>
+
+  <div class="segments" id="segments"></div>
 </div>
 
 <script>
@@ -156,31 +175,41 @@ const filenameEl = document.getElementById('filename');
 const textEl = document.getElementById('text');
 const textLabel = document.getElementById('textLabel');
 const charCount = document.getElementById('charCount');
-const readBtn = document.getElementById('readBtn');
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
 const statusEl = document.getElementById('status');
 const player = document.getElementById('player');
-const downloadEl = document.getElementById('download');
 const speedEl = document.getElementById('speed');
 const speedVal = document.getElementById('speedVal');
+const segmentsEl = document.getElementById('segments');
 
-let voice = 'female';
+let voice = '{{ default_voice }}';
 
-// 声音选择
+// 朗读引擎的状态
+let segments = [];        // 分好的段落文字
+let audioCache = {};      // 已生成的语音（按段缓存）
+let current = -1;         // 当前正在读第几段
+let playing = false;      // 是否处于朗读流程中
+
+// ---- 声音选择 ----
 document.querySelectorAll('.voice').forEach(el => {
   el.onclick = () => {
     document.querySelectorAll('.voice').forEach(v => v.classList.remove('active'));
     el.classList.add('active');
     voice = el.dataset.voice;
+    audioCache = {};   // 换了声音，之前生成的作废
   };
 });
 
-// 语速显示
+// ---- 语速 ----
 speedEl.oninput = () => {
   const v = parseInt(speedEl.value);
   speedVal.textContent = v === 0 ? '原速' : (v > 0 ? '+' + v + '%' : v + '%');
+  audioCache = {};     // 换了语速，之前生成的作废
 };
 
-// 文件选择与拖拽
+// ---- 文件选择与拖拽 ----
 drop.onclick = () => fileInput.click();
 drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
 drop.ondragleave = () => drop.classList.remove('over');
@@ -200,7 +229,8 @@ async function handleFile(file) {
   filenameEl.textContent = '📄 ' + file.name;
   filenameEl.style.display = 'block';
   setStatus('正在读取文档…', 'info');
-  readBtn.disabled = true;
+  stopReading();
+  playBtn.disabled = true;
 
   const form = new FormData();
   form.append('file', file);
@@ -213,46 +243,158 @@ async function handleFile(file) {
     textLabel.style.display = 'block';
     charCount.style.display = 'block';
     charCount.textContent = '共 ' + data.chars + ' 个字';
-    readBtn.disabled = false;
-    setStatus('文档读取成功，点击下面的按钮开始朗读', 'info');
+    playBtn.disabled = false;
+    setStatus('文档读取成功，点击「开始朗读」即可', 'info');
   } catch (err) {
     setStatus('❌ ' + err.message, 'error');
   }
 }
 
-readBtn.onclick = async () => {
-  const text = textEl.value.trim();
-  if (!text) { setStatus('❌ 没有可朗读的文字', 'error'); return; }
-
-  readBtn.disabled = true;
-  player.style.display = 'none';
-  downloadEl.style.display = 'none';
-  setStatus('正在生成语音，文档越长等待越久，请稍候…', 'info');
-
-  try {
-    const resp = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, voice: voice, speed: parseInt(speedEl.value) })
-    });
-    if (!resp.ok) {
-      const data = await resp.json();
-      throw new Error(data.error || '语音合成失败');
+// ---- 把长文字分成适合朗读的小段 ----
+function splitSegments(text, maxChars = 180) {
+  const segs = [];
+  for (let para of text.split(/\n+/)) {
+    para = para.trim();
+    if (!para) continue;
+    if (para.length <= maxChars) { segs.push(para); continue; }
+    // 段落太长，按句子标点再切
+    const sentences = para.split(/(?<=[。！？!?；;])/);
+    let buf = '';
+    for (const s of sentences) {
+      if (!s) continue;
+      if ((buf + s).length <= maxChars) { buf += s; }
+      else {
+        if (buf) segs.push(buf);
+        if (s.length <= maxChars) { buf = s; }
+        else { // 单句仍超长，硬切
+          for (let i = 0; i < s.length; i += maxChars) segs.push(s.slice(i, i + maxChars));
+          buf = '';
+        }
+      }
     }
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    player.src = url;
-    player.style.display = 'block';
-    downloadEl.href = url;
-    downloadEl.style.display = 'block';
-    setStatus('✅ 语音生成完毕，正在播放', 'info');
-    player.play();
+    if (buf) segs.push(buf);
+  }
+  return segs;
+}
+
+// ---- 渲染段落列表 ----
+function renderSegments() {
+  segmentsEl.innerHTML = '';
+  segments.forEach((seg, i) => {
+    const div = document.createElement('div');
+    div.className = 'seg';
+    div.dataset.index = i;
+    div.innerHTML = '<span class="num">' + (i + 1) + '</span><span>' + escapeHtml(seg) + '</span>';
+    div.onclick = () => { playFrom(i); };  // 点哪段就从哪段开始
+    segmentsEl.appendChild(div);
+  });
+  segmentsEl.style.display = segments.length ? 'block' : 'none';
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function highlight(i) {
+  segmentsEl.querySelectorAll('.seg').forEach(el => {
+    const idx = parseInt(el.dataset.index);
+    el.classList.toggle('playing', idx === i);
+    el.classList.toggle('done', idx < i);
+  });
+  const cur = segmentsEl.querySelector('.seg.playing');
+  if (cur) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// ---- 生成某一段的语音（带缓存，避免重复生成）----
+async function fetchSegment(i) {
+  if (audioCache[i]) return audioCache[i];
+  const resp = await fetch('/api/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: segments[i], voice: voice, speed: parseInt(speedEl.value) })
+  });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.error || '语音合成失败');
+  }
+  const url = URL.createObjectURL(await resp.blob());
+  audioCache[i] = url;
+  return url;
+}
+
+// ---- 从第 i 段开始朗读 ----
+async function playFrom(i) {
+  if (i < 0 || i >= segments.length) { finishReading(); return; }
+  playing = true;
+  current = i;
+  updateButtons();
+  highlight(i);
+  setStatus('正在朗读 第 ' + (i + 1) + ' / ' + segments.length + ' 段…', 'info');
+  player.style.display = 'block';
+
+  let url;
+  try {
+    url = await fetchSegment(i);
   } catch (err) {
     setStatus('❌ ' + err.message, 'error');
-  } finally {
-    readBtn.disabled = false;
+    stopReading();
+    return;
   }
+  if (!playing || current !== i) return;  // 期间被停止/跳段了
+
+  player.src = url;
+  player.play();
+  // 提前把下一段也生成好，衔接更顺
+  if (i + 1 < segments.length) fetchSegment(i + 1).catch(() => {});
+}
+
+// 一段读完，自动接下一段
+player.onended = () => { if (playing) playFrom(current + 1); };
+
+function finishReading() {
+  setStatus('✅ 全部朗读完毕', 'info');
+  stopReading();
+}
+
+function stopReading() {
+  playing = false;
+  current = -1;
+  player.pause();
+  highlight(-1);
+  updateButtons();
+}
+
+function updateButtons() {
+  stopBtn.disabled = !playing;
+  pauseBtn.disabled = !playing;
+  pauseBtn.textContent = (playing && player.paused) ? '▶ 继续' : '⏸ 暂停';
+}
+
+// ---- 按钮 ----
+playBtn.onclick = () => {
+  const text = textEl.value.trim();
+  if (!text) { setStatus('❌ 没有可朗读的文字', 'error'); return; }
+  segments = splitSegments(text);
+  audioCache = {};
+  renderSegments();
+  setStatus('正在准备语音，请稍候…', 'info');
+  playFrom(0);
 };
+
+pauseBtn.onclick = () => {
+  if (!playing) return;
+  if (player.paused) { player.play(); setStatus('继续朗读…', 'info'); }
+  else { player.pause(); setStatus('已暂停，点「继续」接着读', 'info'); }
+  updateButtons();
+};
+
+stopBtn.onclick = () => {
+  stopReading();
+  setStatus('已停止', 'info');
+};
+
+player.onplay = updateButtons;
+player.onpause = updateButtons;
 </script>
 </body>
 </html>
