@@ -51,6 +51,13 @@
   .drop .small { font-size: 13px; }
   #fileInput { display: none; }
 
+  .pasteToggle {
+    display: block; width: 100%; margin-top: 12px; padding: 10px;
+    background: none; border: none; color: #4f7cf0;
+    font-size: 14px; cursor: pointer; text-align: center;
+  }
+  .pasteToggle:hover { text-decoration: underline; }
+
   .filename {
     margin-top: 12px; font-size: 14px; color: #4f7cf0;
     display: none; word-break: break-all;
@@ -137,6 +144,8 @@
   </div>
   <input type="file" id="fileInput" accept=".docx,.txt,.md,.markdown">
 
+  <button class="pasteToggle" id="pasteToggle">✍️ 或者直接粘贴 / 输入文字来朗读</button>
+
   <div class="section">
     <div class="label">选择声音</div>
     <div class="voices" id="voices">
@@ -162,8 +171,8 @@
   </div>
 
   <div class="section">
-    <div class="label" id="textLabel" style="display:none">文档内容（可以修改后再朗读）</div>
-    <textarea id="text" placeholder="上传文档后，文字会显示在这里"></textarea>
+    <div class="label" id="textLabel" style="display:none">要朗读的文字（可以修改后再朗读）</div>
+    <textarea id="text" placeholder="把要朗读的文字粘贴到这里（从微信长按复制后，在这里粘贴即可）"></textarea>
     <div class="charCount" id="charCount"></div>
   </div>
 
@@ -194,6 +203,7 @@ const player = document.getElementById('player');
 const speedEl = document.getElementById('speed');
 const speedVal = document.getElementById('speedVal');
 const segmentsEl = document.getElementById('segments');
+const pasteToggle = document.getElementById('pasteToggle');
 
 let voice = '{{ default_voice }}';
 
@@ -235,6 +245,27 @@ function setStatus(msg, type) {
   statusEl.textContent = msg || '';
   statusEl.className = 'status' + (type ? ' ' + type : '');
 }
+
+// 显示文字框（粘贴/编辑用）
+function showTextBox() {
+  textEl.style.display = 'block';
+  textLabel.style.display = 'block';
+  charCount.style.display = 'block';
+}
+
+// 文字框内容变化时：更新字数、决定“开始朗读”按钮能不能点
+textEl.addEventListener('input', () => {
+  const n = textEl.value.trim().length;
+  charCount.textContent = '共 ' + n + ' 个字';
+  playBtn.disabled = (n === 0);
+});
+
+// “直接粘贴/输入文字”入口
+pasteToggle.onclick = () => {
+  showTextBox();
+  textEl.focus();
+  setStatus('把文字粘贴到下面的框里，然后点「开始朗读」', 'info');
+};
 
 async function handleFile(file) {
   filenameEl.textContent = '📄 ' + file.name;
