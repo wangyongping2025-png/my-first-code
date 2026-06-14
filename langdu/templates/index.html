@@ -252,37 +252,45 @@ async function handleFile(file) {
   }
 }
 
-// ---- 把长文字分成适合朗读的小段，并标记每段后面的停顿时长 ----
-function splitSegments(text, maxChars = 180) {
-  const segs = [];
-  for (let para of text.split(/\n+/)) {
-    para = para.trim();
-    if (!para) continue;
-    const pieces = [];
-    if (para.length <= maxChars) { pieces.push(para); }
-    else {
-      const sentences = para.split(/(?<=[。！？!?；;])/);
-      let buf = '';
-      for (const s of sentences) {
-        if (!s) continue;
-        if ((buf + s).length <= maxChars) { buf += s; }
-        else {
-          if (buf) pieces.push(buf);
-          if (s.length <= maxChars) { buf = s; }
-          else {
-            for (let i = 0; i < s.length; i += maxChars) pieces.push(s.slice(i, i + maxChars));
-            buf = '';
-          }
-        }
-      }
-      if (buf) pieces.push(buf);
+// ---- 把长文字分成适合朗读的小段（只在句末标点处断，标题单独成段）----
+function isHeading(s) {
+  return /^[一二三四五六七八九十]{1,3}、/.test(s) || /^\d{1,2}[.、]\s*\S/.test(s);
+}
+function splitSegments(text, maxChars = 120) {
+  // 1) 先把每个换行块按句末标点切成"句子"，标题单独标记
+  const units = [];
+  for (const line of text.split(/\n+/)) {
+    const t = line.trim();
+    if (!t) continue;
+    if (isHeading(t)) { units.push({ t, head: true }); continue; }
+    for (let s of t.split(/(?<=[。！？!?；;…])/)) {
+      s = s.trim();
+      if (s) units.push({ t: s, head: false });
     }
-    // 句子之间短停 250ms；一段读完后停顿长一点 700ms，衔接更自然
-    pieces.forEach((t, idx) => {
-      segs.push({ text: t, pause: (idx === pieces.length - 1) ? 700 : 250 });
-    });
   }
-  return segs;
+  // 2) 标题单独成段；普通句子累积到 maxChars 再断（绝不切断词）
+  const segs = [];
+  let buf = '';
+  const flush = () => { if (buf.trim()) { segs.push(buf.trim()); buf = ''; } };
+  for (const u of units) {
+    if (u.head) { flush(); segs.push(u.t); continue; }
+    if (!buf) buf = u.t;
+    else if ((buf + u.t).length <= maxChars) buf += u.t;
+    else { flush(); buf = u.t; }
+    if (buf.length >= maxChars) flush();
+  }
+  flush();
+  // 3) 兜底：极长又没有标点的句子才硬切（少见）
+  const out = [];
+  for (const s of segs) {
+    if (s.length <= maxChars * 2) out.push(s);
+    else for (let i = 0; i < s.length; i += maxChars) out.push(s.slice(i, i + maxChars));
+  }
+  // 4) 配停顿：标题后停久一点，句末停适中
+  return out.map(t => ({
+    text: t,
+    pause: isHeading(t) ? 800 : (/[。！？!?]$/.test(t) ? 600 : 300)
+  }));
 }
 
 // ---- 渲染段落列表 ----

@@ -75,14 +75,26 @@ def read_md(data: bytes) -> str:
 
 
 def read_pdf(data: bytes) -> str:
-    """读取 PDF，逐页提取文字。"""
+    """读取 PDF，逐页提取文字。
+
+    处理两个常见坑：
+    1) 一个词被分页处切断 —— 各页用空串拼接，不在页边界插换行；
+    2) 小标题（一、二、… / 1. 2.）粘在正文里 —— 在标题前断行，使其单独成段。
+    """
     reader = PdfReader(io.BytesIO(data))
-    pages = [(page.extract_text() or "").strip() for page in reader.pages]
-    text = "\n".join(p for p in pages if p)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    if not text.strip():
+    text = "".join((page.extract_text() or "") for page in reader.pages)
+    # 在“一、二、…十、”这类中文小标题前断行（标题前一般有空白）
+    text = re.sub(r"\s+(?=[一二三四五六七八九十]{1,3}、)", "\n", text)
+    # 在“1. 2.”这类编号列表项前断行
+    text = re.sub(r"\s+(?=\d{1,2}[.、]\s*[^\d\s])", "\n", text)
+    # 规整空白
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\s*\n\s*", "\n", text)
+    text = re.sub(r"\n{2,}", "\n", text)
+    text = text.strip()
+    if not text:
         raise ValueError("这个 PDF 里没有可提取的文字，可能是扫描件（图片型 PDF），无法朗读")
-    return text.strip()
+    return text
 
 
 def extract_text(filename: str, data: bytes) -> str:
