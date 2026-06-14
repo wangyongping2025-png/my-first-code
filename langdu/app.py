@@ -22,6 +22,7 @@ import re
 
 import edge_tts
 from docx import Document
+from pypdf import PdfReader
 from flask import Flask, jsonify, render_template, request, send_file
 
 app = Flask(__name__)
@@ -75,6 +76,17 @@ def read_md(data: bytes) -> str:
     return text.strip()
 
 
+def read_pdf(data: bytes) -> str:
+    """读取 PDF，逐页提取文字。"""
+    reader = PdfReader(io.BytesIO(data))
+    pages = [(page.extract_text() or "").strip() for page in reader.pages]
+    text = "\n".join(p for p in pages if p)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if not text.strip():
+        raise ValueError("这个 PDF 里没有可提取的文字，可能是扫描件（图片型 PDF），无法朗读")
+    return text.strip()
+
+
 def extract_text(filename: str, data: bytes) -> str:
     name = filename.lower()
     if name.endswith(".docx"):
@@ -83,9 +95,11 @@ def extract_text(filename: str, data: bytes) -> str:
         return read_md(data)
     if name.endswith(".txt"):
         return read_txt(data).strip()
+    if name.endswith(".pdf"):
+        return read_pdf(data)
     if name.endswith(".doc"):
         raise ValueError("暂不支持老版 .doc 格式，请用 Word 另存为 .docx 后再上传")
-    raise ValueError("只支持 .docx、.txt、.md 格式的文档")
+    raise ValueError("只支持 .docx、.pdf、.txt、.md 格式的文档")
 
 
 # ---------- 语音合成 ----------
