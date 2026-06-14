@@ -256,7 +256,8 @@ async function handleFile(file) {
 function isHeading(s) {
   return /^[一二三四五六七八九十]{1,3}、/.test(s) || /^\d{1,2}[.、]\s*\S/.test(s);
 }
-function splitSegments(text, maxChars = 120) {
+// 合成时用"大块"（约 400 字）一次合成：让引擎自己连贯地读多段，接缝最少、最顺
+function splitSegments(text, maxChars = 400) {
   // 1) 先把每个换行块按句末标点切成"句子"，标题单独标记
   const units = [];
   for (const line of text.split(/\n+/)) {
@@ -286,10 +287,10 @@ function splitSegments(text, maxChars = 120) {
     if (s.length <= maxChars * 2) out.push(s);
     else for (let i = 0; i < s.length; i += maxChars) out.push(s.slice(i, i + maxChars));
   }
-  // 4) 配停顿：标题后停久一点，句末停适中
+  // 4) 配停顿：去掉生硬的长停顿，只留极小的自然衔接（接缝在大块之间，已很少）
   return out.map(t => ({
     text: t,
-    pause: isHeading(t) ? 800 : (/[。！？!?]$/.test(t) ? 600 : 300)
+    pause: isHeading(t) ? 250 : 120
   }));
 }
 
