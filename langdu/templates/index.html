@@ -9,7 +9,6 @@
 <link rel="manifest" href="/static/manifest.json">
 <meta name="theme-color" content="#4f7cf0">
 <link rel="icon" href="/static/favicon-32.png" sizes="32x32">
-<!-- iPhone / iPad 专用 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -23,7 +22,7 @@
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    padding: 40px 16px;
+    padding: 24px 14px;
     color: #2b3145;
   }
   .card {
@@ -31,108 +30,82 @@
     border-radius: 18px;
     box-shadow: 0 10px 40px rgba(60, 80, 130, 0.12);
     width: 100%;
-    max-width: 720px;
-    padding: 24px;
+    max-width: 560px;
+    padding: 20px;
   }
-  h1 { font-size: 23px; margin-bottom: 4px; }
-  .subtitle { color: #8a90a3; font-size: 13px; margin-bottom: 18px; }
 
-  .drop {
-    border: 2px dashed #b9c4dd;
-    border-radius: 14px;
-    padding: 22px 16px;
-    text-align: center;
-    cursor: pointer;
-    transition: all .2s;
-    color: #6b7390;
-  }
-  .drop:hover, .drop.over { border-color: #4f7cf0; background: #f3f7ff; }
-  .drop .big { font-size: 16px; color: #3c4566; margin-bottom: 4px; }
-  .drop .small { font-size: 12px; }
+  /* 标题：居中，无副标题 */
+  h1 { font-size: 24px; text-align: center; margin-bottom: 16px; }
+
+  /* 合并输入框：上传文件 + 粘贴文字，同一个框 */
+  .inputbox { border: 2px solid #d7deec; border-radius: 14px; overflow: hidden; }
+  .drop { padding: 16px; text-align: center; cursor: pointer; color: #6b7390; transition: background .2s; }
+  .drop:hover, .drop.over { background: #f3f7ff; }
+  .drop .big { font-size: 15px; color: #3c4566; }
+  .drop .small { font-size: 12px; margin-top: 3px; }
+  .filename { margin-top: 8px; font-size: 13px; color: #4f7cf0; display: none; word-break: break-all; }
   #fileInput { display: none; }
-
-  .pasteToggle {
-    display: block; width: 100%; margin-top: 10px; padding: 8px;
-    background: none; border: none; color: #4f7cf0;
-    font-size: 14px; cursor: pointer; text-align: center;
-  }
-  .pasteToggle:hover { text-decoration: underline; }
-
-  .filename {
-    margin-top: 10px; font-size: 14px; color: #4f7cf0;
-    display: none; word-break: break-all;
-  }
-
-  .section { margin-top: 16px; }
-  .label { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-
-  /* 声音：横向一排，可左右滑动 */
-  .voices {
-    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
-    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
-  }
-  .voice {
-    flex: 0 0 auto; width: 92px; scroll-snap-align: start;
-    border: 2px solid #e3e7f2;
-    border-radius: 12px;
-    padding: 10px 6px;
-    text-align: center;
-    cursor: pointer;
-    transition: all .15s;
-    user-select: none;
-  }
-  .voice .icon { font-size: 24px; }
-  .voice .name { font-size: 14px; font-weight: 600; margin-top: 3px; }
-  .voice .gender { font-size: 10px; color: #4f7cf0; margin-top: 1px; }
-  .voice .desc { font-size: 10px; color: #8a90a3; margin-top: 2px; line-height: 1.3; }
-  .voice.active { border-color: #4f7cf0; background: #f3f7ff; }
-
-  .speedRow { display: flex; align-items: center; gap: 14px; }
-  input[type=range] { flex: 1; accent-color: #4f7cf0; }
-  .speedVal { width: 56px; text-align: right; font-size: 14px; color: #4f7cf0; font-weight: 600; }
-
+  .or { text-align: center; font-size: 12px; color: #aab0c2; padding-bottom: 6px; }
   textarea {
-    width: 100%; height: 120px; resize: vertical;
-    border: 1.5px solid #e3e7f2; border-radius: 12px;
-    padding: 12px; font-size: 14px; line-height: 1.7;
-    color: #2b3145; outline: none; display: none;
+    display: block; width: 100%; height: 86px; resize: vertical;
+    border: none; border-top: 1.5px solid #eef1f8; outline: none;
+    padding: 12px; font-size: 14px; line-height: 1.6; color: #2b3145; background: #fafbfe;
   }
-  textarea:focus { border-color: #4f7cf0; }
-  .charCount { font-size: 12px; color: #8a90a3; margin-top: 6px; display: none; }
+  .charCount { font-size: 12px; color: #8a90a3; margin-top: 6px; text-align: right; min-height: 16px; }
 
-  .btnRow { display: flex; gap: 8px; margin-top: 16px; }
+  /* 开始朗读 / 暂停 / 停止 */
+  .btnRow { display: flex; gap: 8px; margin-top: 12px; }
   .btn {
     flex: 1;
     background: linear-gradient(135deg, #4f7cf0, #6b5ef0);
     color: #fff; border: none; border-radius: 10px;
-    padding: 11px; font-size: 15px; font-weight: 600;
+    padding: 12px; font-size: 15px; font-weight: 600;
     cursor: pointer; transition: opacity .15s;
   }
   .btn:hover { opacity: .92; }
   .btn:disabled { opacity: .4; cursor: not-allowed; }
   .btn.secondary {
     background: #eef1f8; color: #4f5670; flex: 0 0 auto;
-    padding: 11px 13px; font-size: 14px; font-weight: 500;
+    padding: 12px 14px; font-size: 14px; font-weight: 500;
   }
 
-  .status { margin-top: 12px; font-size: 13px; text-align: center; display: none; }
+  .status { margin-top: 10px; font-size: 13px; text-align: center; display: none; }
   .status.info { color: #4f7cf0; display: block; }
   .status.error { color: #e05656; display: block; }
+  audio { width: 100%; margin-top: 10px; display: none; }
 
-  audio { width: 100%; margin-top: 14px; display: none; }
+  .section { margin-top: 16px; }
+  .label { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
 
+  /* 语速 */
+  .speedRow { display: flex; align-items: center; gap: 12px; }
+  input[type=range] { flex: 1; accent-color: #4f7cf0; }
+  .speedVal { width: 50px; text-align: right; font-size: 13px; color: #4f7cf0; font-weight: 600; }
+
+  /* 选择声音：两行三个，一屏可见，不左右滑 */
+  .voices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .voice {
+    border: 2px solid #e3e7f2; border-radius: 10px;
+    padding: 8px 4px; text-align: center; cursor: pointer;
+    transition: all .15s; user-select: none;
+  }
+  .voice .icon { font-size: 22px; line-height: 1.1; }
+  .voice .name { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .voice .gender { font-size: 10px; color: #4f7cf0; }
+  .voice .desc { font-size: 10px; color: #8a90a3; margin-top: 1px; }
+  .voice.active { border-color: #4f7cf0; background: #f3f7ff; }
+
+  /* 朗读进度（段落列表） */
   .segments {
-    margin-top: 14px; max-height: 220px; overflow-y: auto;
-    border: 1.5px solid #eef1f8; border-radius: 12px; padding: 6px;
-    display: none;
+    margin-top: 14px; max-height: 200px; overflow-y: auto;
+    border: 1.5px solid #eef1f8; border-radius: 12px; padding: 6px; display: none;
   }
   .seg {
-    padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 1.6;
-    cursor: pointer; transition: background .12s; color: #4f5670;
-    display: flex; gap: 10px;
+    padding: 9px 10px; border-radius: 8px; font-size: 14px; line-height: 1.6;
+    cursor: pointer; transition: background .12s; color: #4f5670; display: flex; gap: 10px;
   }
   .seg:hover { background: #f3f7ff; }
-  .seg .num { color: #b9c0d4; font-size: 12px; flex: 0 0 28px; padding-top: 2px; }
+  .seg .num { color: #b9c0d4; font-size: 12px; flex: 0 0 26px; padding-top: 2px; }
   .seg.playing { background: #eaf1ff; color: #2b3145; }
   .seg.playing .num { color: #4f7cf0; font-weight: 700; }
   .seg.done { color: #aab0c2; }
@@ -141,17 +114,42 @@
 <body>
 <div class="card">
   <h1>📖 朗读文档</h1>
-  <div class="subtitle">上传 Word / PDF / TXT / Markdown 文档，选个喜欢的声音，听它富有感情地为你朗读</div>
 
-  <div class="drop" id="drop">
-    <div class="big">点击选择文档，或把文件拖到这里</div>
-    <div class="small">支持 .docx、.pdf、.txt、.md，最大 20MB</div>
-    <div class="filename" id="filename"></div>
+  <!-- 合并输入框：可上传文件，也可直接粘贴文字 -->
+  <div class="inputbox">
+    <div class="drop" id="drop">
+      <div class="big">点击选择文档，或把文件拖进来</div>
+      <div class="small">支持 Word / PDF / TXT / Markdown</div>
+      <div class="filename" id="filename"></div>
+    </div>
+    <div class="or">— 或 直接粘贴 / 输入文字 —</div>
+    <textarea id="text" placeholder="把要朗读的文字粘贴到这里（从微信长按复制后，在这里粘贴即可）"></textarea>
   </div>
   <input type="file" id="fileInput" accept=".docx,.pdf,.txt,.md,.markdown,application/pdf">
+  <div class="charCount" id="charCount"></div>
 
-  <button class="pasteToggle" id="pasteToggle">✍️ 或者直接粘贴 / 输入文字来朗读</button>
+  <!-- 开始朗读 / 暂停 / 停止 -->
+  <div class="btnRow">
+    <button class="btn" id="playBtn" disabled>🔊 开始朗读</button>
+    <button class="btn secondary" id="pauseBtn" disabled>⏸ 暂停</button>
+    <button class="btn secondary" id="stopBtn" disabled>⏹ 停止</button>
+  </div>
 
+  <div class="status" id="status"></div>
+  <audio id="player" controls></audio>
+
+  <!-- 语速：放在开始朗读下方 -->
+  <div class="section">
+    <div class="label">语速</div>
+    <div class="speedRow">
+      <span style="font-size:13px;color:#8a90a3">慢</span>
+      <input type="range" id="speed" min="-50" max="50" step="10" value="0">
+      <span style="font-size:13px;color:#8a90a3">快</span>
+      <span class="speedVal" id="speedVal">原速</span>
+    </div>
+  </div>
+
+  <!-- 选择声音：放在最下面，两行三个 -->
   <div class="section">
     <div class="label">选择声音</div>
     <div class="voices" id="voices">
@@ -166,31 +164,6 @@
     </div>
   </div>
 
-  <div class="section">
-    <div class="label">语速</div>
-    <div class="speedRow">
-      <span style="font-size:13px;color:#8a90a3">慢</span>
-      <input type="range" id="speed" min="-50" max="50" step="10" value="0">
-      <span style="font-size:13px;color:#8a90a3">快</span>
-      <span class="speedVal" id="speedVal">原速</span>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="label" id="textLabel" style="display:none">要朗读的文字（可以修改后再朗读）</div>
-    <textarea id="text" placeholder="把要朗读的文字粘贴到这里（从微信长按复制后，在这里粘贴即可）"></textarea>
-    <div class="charCount" id="charCount"></div>
-  </div>
-
-  <div class="btnRow">
-    <button class="btn" id="playBtn" disabled>🔊 开始朗读</button>
-    <button class="btn secondary" id="pauseBtn" disabled>⏸ 暂停</button>
-    <button class="btn secondary" id="stopBtn" disabled>⏹ 停止</button>
-  </div>
-
-  <div class="status" id="status"></div>
-  <audio id="player" controls></audio>
-
   <div class="segments" id="segments"></div>
 </div>
 
@@ -199,7 +172,6 @@ const drop = document.getElementById('drop');
 const fileInput = document.getElementById('fileInput');
 const filenameEl = document.getElementById('filename');
 const textEl = document.getElementById('text');
-const textLabel = document.getElementById('textLabel');
 const charCount = document.getElementById('charCount');
 const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
@@ -209,7 +181,6 @@ const player = document.getElementById('player');
 const speedEl = document.getElementById('speed');
 const speedVal = document.getElementById('speedVal');
 const segmentsEl = document.getElementById('segments');
-const pasteToggle = document.getElementById('pasteToggle');
 
 let voice = '{{ default_voice }}';
 
@@ -252,33 +223,19 @@ function setStatus(msg, type) {
   statusEl.className = 'status' + (type ? ' ' + type : '');
 }
 
-// 显示文字框（粘贴/编辑用）
-function showTextBox() {
-  textEl.style.display = 'block';
-  textLabel.style.display = 'block';
-  charCount.style.display = 'block';
-}
-
-// 文字框内容变化时：更新字数、决定“开始朗读”按钮能不能点
-textEl.addEventListener('input', () => {
+// 文字框内容变化时：更新字数、决定“开始朗读”能不能点
+function refreshText() {
   const n = textEl.value.trim().length;
-  charCount.textContent = '共 ' + n + ' 个字';
+  charCount.textContent = n ? ('共 ' + n + ' 个字') : '';
   playBtn.disabled = (n === 0);
-});
-
-// “直接粘贴/输入文字”入口
-pasteToggle.onclick = () => {
-  showTextBox();
-  textEl.focus();
-  setStatus('把文字粘贴到下面的框里，然后点「开始朗读」', 'info');
-};
+}
+textEl.addEventListener('input', refreshText);
 
 async function handleFile(file) {
   filenameEl.textContent = '📄 ' + file.name;
   filenameEl.style.display = 'block';
   setStatus('正在读取文档…', 'info');
   stopReading();
-  playBtn.disabled = true;
 
   const form = new FormData();
   form.append('file', file);
@@ -287,11 +244,7 @@ async function handleFile(file) {
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || '读取失败');
     textEl.value = data.text;
-    textEl.style.display = 'block';
-    textLabel.style.display = 'block';
-    charCount.style.display = 'block';
-    charCount.textContent = '共 ' + data.chars + ' 个字';
-    playBtn.disabled = false;
+    refreshText();
     setStatus('文档读取成功，点击「开始朗读」即可', 'info');
   } catch (err) {
     setStatus('❌ ' + err.message, 'error');
@@ -305,7 +258,6 @@ function splitSegments(text, maxChars = 180) {
     para = para.trim();
     if (!para) continue;
     if (para.length <= maxChars) { segs.push(para); continue; }
-    // 段落太长，按句子标点再切
     const sentences = para.split(/(?<=[。！？!?；;])/);
     let buf = '';
     for (const s of sentences) {
@@ -314,7 +266,7 @@ function splitSegments(text, maxChars = 180) {
       else {
         if (buf) segs.push(buf);
         if (s.length <= maxChars) { buf = s; }
-        else { // 单句仍超长，硬切
+        else {
           for (let i = 0; i < s.length; i += maxChars) segs.push(s.slice(i, i + maxChars));
           buf = '';
         }
@@ -333,7 +285,7 @@ function renderSegments() {
     div.className = 'seg';
     div.dataset.index = i;
     div.innerHTML = '<span class="num">' + (i + 1) + '</span><span>' + escapeHtml(seg) + '</span>';
-    div.onclick = () => { playFrom(i); };  // 点哪段就从哪段开始
+    div.onclick = () => { playFrom(i); };
     segmentsEl.appendChild(div);
   });
   segmentsEl.style.display = segments.length ? 'block' : 'none';
@@ -353,7 +305,7 @@ function highlight(i) {
   if (cur) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
-// ---- 生成某一段的语音（带缓存，避免重复生成）----
+// ---- 生成某一段的语音（带缓存）----
 async function fetchSegment(i) {
   if (audioCache[i]) return audioCache[i];
   const resp = await fetch('/api/tts', {
@@ -388,15 +340,13 @@ async function playFrom(i) {
     stopReading();
     return;
   }
-  if (!playing || current !== i) return;  // 期间被停止/跳段了
+  if (!playing || current !== i) return;
 
   player.src = url;
   player.play();
-  // 提前把下一段也生成好，衔接更顺
   if (i + 1 < segments.length) fetchSegment(i + 1).catch(() => {});
 }
 
-// 一段读完，自动接下一段
 player.onended = () => { if (playing) playFrom(current + 1); };
 
 function finishReading() {
@@ -445,7 +395,6 @@ player.onplay = updateButtons;
 player.onpause = updateButtons;
 
 // 注册 Service Worker（让它能“添加到主屏幕”、二次打开更快）
-// 仅在安全环境（https 或 localhost）下生效；局域网 http 会自动跳过，不影响使用
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
