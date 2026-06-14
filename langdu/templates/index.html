@@ -96,12 +96,13 @@
   .voice.active { border-color: #4f7cf0; background: #f3f7ff; }
 
   /* 朗读进度（段落列表） */
+  /* 朗读时的文字：铺满、随页面一起滑，不再关在小框里单独滚 */
   .segments {
-    margin-top: 14px; max-height: 200px; overflow-y: auto;
+    margin-top: 14px;
     border: 1.5px solid #eef1f8; border-radius: 12px; padding: 6px; display: none;
   }
   .seg {
-    padding: 9px 10px; border-radius: 8px; font-size: 14px; line-height: 1.6;
+    padding: 11px 12px; border-radius: 8px; font-size: 16px; line-height: 1.9;
     cursor: pointer; transition: background .12s; color: #4f5670; display: flex; gap: 10px;
   }
   .seg:hover { background: #f3f7ff; }
@@ -302,7 +303,8 @@ function highlight(i) {
     el.classList.toggle('done', idx < i);
   });
   const cur = segmentsEl.querySelector('.seg.playing');
-  if (cur) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  // 正在读的那段自动滚到屏幕中间，边听边看不用手动滑
+  if (cur) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 // ---- 生成某一段的语音（带缓存）----
