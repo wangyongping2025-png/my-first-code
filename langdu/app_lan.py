@@ -48,4 +48,4 @@ if __name__ == "__main__":
     print()
     print(line)
     # host=0.0.0.0 表示允许同一 Wi-Fi 下的其它设备（手机）访问
-    app.run(host="0.0.0.0", port=PORT, debug=False)
+    app.run(host="0.0.0.0", port=PORT, debug=False, threaded=True)
