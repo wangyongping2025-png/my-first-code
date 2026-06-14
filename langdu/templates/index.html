@@ -22,7 +22,7 @@
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    padding: 24px 14px;
+    padding: 12px;
     color: #2b3145;
   }
   .card {
@@ -31,30 +31,30 @@
     box-shadow: 0 10px 40px rgba(60, 80, 130, 0.12);
     width: 100%;
     max-width: 560px;
-    padding: 20px;
+    padding: 16px;
   }
 
   /* 标题：居中，无副标题 */
-  h1 { font-size: 24px; text-align: center; margin-bottom: 16px; }
+  h1 { font-size: 22px; text-align: center; margin-bottom: 12px; }
 
   /* 合并输入框：上传文件 + 粘贴文字，同一个框 */
   .inputbox { border: 2px solid #d7deec; border-radius: 14px; overflow: hidden; }
-  .drop { padding: 16px; text-align: center; cursor: pointer; color: #6b7390; transition: background .2s; }
+  .drop { padding: 12px; text-align: center; cursor: pointer; color: #6b7390; transition: background .2s; }
   .drop:hover, .drop.over { background: #f3f7ff; }
-  .drop .big { font-size: 15px; color: #3c4566; }
+  .drop .big { font-size: 15px; color: #3c4566; white-space: nowrap; }
   .drop .small { font-size: 12px; margin-top: 3px; }
-  .filename { margin-top: 8px; font-size: 13px; color: #4f7cf0; display: none; word-break: break-all; }
+  .filename { margin-top: 6px; font-size: 13px; color: #4f7cf0; display: none; word-break: break-all; }
   #fileInput { display: none; }
-  .or { text-align: center; font-size: 12px; color: #aab0c2; padding-bottom: 6px; }
+  .or { text-align: center; font-size: 12px; color: #aab0c2; padding-bottom: 4px; }
   textarea {
-    display: block; width: 100%; height: 86px; resize: vertical;
+    display: block; width: 100%; height: 60px; resize: vertical;
     border: none; border-top: 1.5px solid #eef1f8; outline: none;
-    padding: 12px; font-size: 14px; line-height: 1.6; color: #2b3145; background: #fafbfe;
+    padding: 10px 12px; font-size: 14px; line-height: 1.6; color: #2b3145; background: #fafbfe;
   }
-  .charCount { font-size: 12px; color: #8a90a3; margin-top: 6px; text-align: right; min-height: 16px; }
+  .charCount { font-size: 12px; color: #8a90a3; margin-top: 4px; text-align: right; min-height: 14px; }
 
   /* 开始朗读 / 暂停 / 停止 */
-  .btnRow { display: flex; gap: 8px; margin-top: 12px; }
+  .btnRow { display: flex; gap: 8px; margin-top: 10px; }
   .btn {
     flex: 1;
     background: linear-gradient(135deg, #4f7cf0, #6b5ef0);
@@ -74,8 +74,8 @@
   .status.error { color: #e05656; display: block; }
   audio { width: 100%; margin-top: 10px; display: none; }
 
-  .section { margin-top: 16px; }
-  .label { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .section { margin-top: 12px; }
+  .label { font-size: 14px; font-weight: 600; margin-bottom: 7px; }
 
   /* 语速 */
   .speedRow { display: flex; align-items: center; gap: 12px; }
@@ -86,11 +86,11 @@
   .voices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .voice {
     border: 2px solid #e3e7f2; border-radius: 10px;
-    padding: 8px 4px; text-align: center; cursor: pointer;
+    padding: 6px 3px; text-align: center; cursor: pointer;
     transition: all .15s; user-select: none;
   }
-  .voice .icon { font-size: 22px; line-height: 1.1; }
-  .voice .name { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .voice .icon { font-size: 20px; line-height: 1.1; }
+  .voice .name { font-size: 14px; font-weight: 600; margin-top: 1px; }
   .voice .gender { font-size: 10px; color: #4f7cf0; }
   .voice .desc { font-size: 10px; color: #8a90a3; margin-top: 1px; }
   .voice.active { border-color: #4f7cf0; background: #f3f7ff; }
@@ -118,12 +118,12 @@
   <!-- 合并输入框：可上传文件，也可直接粘贴文字 -->
   <div class="inputbox">
     <div class="drop" id="drop">
-      <div class="big">点击选择文档，或把文件拖进来</div>
+      <div class="big">点击选择 / 拖入文档</div>
       <div class="small">支持 Word / PDF / TXT / Markdown</div>
       <div class="filename" id="filename"></div>
     </div>
     <div class="or">— 或 直接粘贴 / 输入文字 —</div>
-    <textarea id="text" placeholder="把要朗读的文字粘贴到这里（从微信长按复制后，在这里粘贴即可）"></textarea>
+    <textarea id="text" placeholder="把要朗读的文字粘贴到这里"></textarea>
   </div>
   <input type="file" id="fileInput" accept=".docx,.pdf,.txt,.md,.markdown,application/pdf">
   <div class="charCount" id="charCount"></div>
