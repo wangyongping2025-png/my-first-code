@@ -252,28 +252,35 @@ async function handleFile(file) {
   }
 }
 
-// ---- 把长文字分成适合朗读的小段 ----
+// ---- 把长文字分成适合朗读的小段，并标记每段后面的停顿时长 ----
 function splitSegments(text, maxChars = 180) {
   const segs = [];
   for (let para of text.split(/\n+/)) {
     para = para.trim();
     if (!para) continue;
-    if (para.length <= maxChars) { segs.push(para); continue; }
-    const sentences = para.split(/(?<=[。！？!?；;])/);
-    let buf = '';
-    for (const s of sentences) {
-      if (!s) continue;
-      if ((buf + s).length <= maxChars) { buf += s; }
-      else {
-        if (buf) segs.push(buf);
-        if (s.length <= maxChars) { buf = s; }
+    const pieces = [];
+    if (para.length <= maxChars) { pieces.push(para); }
+    else {
+      const sentences = para.split(/(?<=[。！？!?；;])/);
+      let buf = '';
+      for (const s of sentences) {
+        if (!s) continue;
+        if ((buf + s).length <= maxChars) { buf += s; }
         else {
-          for (let i = 0; i < s.length; i += maxChars) segs.push(s.slice(i, i + maxChars));
-          buf = '';
+          if (buf) pieces.push(buf);
+          if (s.length <= maxChars) { buf = s; }
+          else {
+            for (let i = 0; i < s.length; i += maxChars) pieces.push(s.slice(i, i + maxChars));
+            buf = '';
+          }
         }
       }
+      if (buf) pieces.push(buf);
     }
-    if (buf) segs.push(buf);
+    // 句子之间短停 250ms；一段读完后停顿长一点 700ms，衔接更自然
+    pieces.forEach((t, idx) => {
+      segs.push({ text: t, pause: (idx === pieces.length - 1) ? 700 : 250 });
+    });
   }
   return segs;
 }
@@ -285,7 +292,7 @@ function renderSegments() {
     const div = document.createElement('div');
     div.className = 'seg';
     div.dataset.index = i;
-    div.innerHTML = '<span class="num">' + (i + 1) + '</span><span>' + escapeHtml(seg) + '</span>';
+    div.innerHTML = '<span class="num">' + (i + 1) + '</span><span>' + escapeHtml(seg.text) + '</span>';
     div.onclick = () => { playFrom(i); };
     segmentsEl.appendChild(div);
   });
@@ -313,7 +320,7 @@ async function fetchSegment(i) {
   const resp = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: segments[i], voice: voice, speed: parseInt(speedEl.value) })
+    body: JSON.stringify({ text: segments[i].text, voice: voice, speed: parseInt(speedEl.value) })
   });
   if (!resp.ok) {
     const data = await resp.json().catch(() => ({}));
@@ -349,7 +356,15 @@ async function playFrom(i) {
   if (i + 1 < segments.length) fetchSegment(i + 1).catch(() => {});
 }
 
-player.onended = () => { if (playing) playFrom(current + 1); };
+// 一段读完，停顿一下再接下一段（段落间停得久一点，更自然）
+player.onended = () => {
+  if (!playing) return;
+  const justFinished = current;
+  const gap = (segments[justFinished] && segments[justFinished].pause) || 300;
+  setTimeout(() => {
+    if (playing && current === justFinished) playFrom(current + 1);
+  }, gap);
+};
 
 function finishReading() {
   setStatus('✅ 全部朗读完毕', 'info');
