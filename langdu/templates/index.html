@@ -82,8 +82,8 @@
   input[type=range] { flex: 1; accent-color: #4f7cf0; }
   .speedVal { width: 50px; text-align: right; font-size: 13px; color: #4f7cf0; font-weight: 600; }
 
-  /* 选择声音：两行三个，一屏可见，不左右滑 */
-  .voices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  /* 选择声音：两行两列（上面两个男声，下面两个女声）*/
+  .voices { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .voice {
     border: 2px solid #e3e7f2; border-radius: 10px;
     padding: 6px 3px; text-align: center; cursor: pointer;

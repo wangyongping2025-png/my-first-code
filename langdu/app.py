@@ -30,12 +30,10 @@ app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 最大 20MB
 
 # 可选的普通话声音（都是自然有感情的神经网络语音）
 VOICES = {
-    "zh-CN-YunjianNeural":  {"name": "云健", "gender": "男声", "desc": "浑厚稳重", "emoji": "🧔"},
-    "zh-CN-YunxiNeural":    {"name": "云希", "gender": "男声", "desc": "自然清爽", "emoji": "👨"},
-    "zh-CN-YunyangNeural":  {"name": "云扬", "gender": "男声", "desc": "专业播报", "emoji": "📻"},
-    "zh-CN-YunxiaNeural":   {"name": "云夏", "gender": "男声", "desc": "少年讲故事", "emoji": "🧒"},
-    "zh-CN-XiaoxiaoNeural": {"name": "晓晓", "gender": "女声", "desc": "温暖亲切", "emoji": "👩"},
-    "zh-CN-XiaoyiNeural":   {"name": "晓伊", "gender": "女声", "desc": "活泼灵动", "emoji": "👧"},
+    "zh-CN-YunjianNeural":  {"name": "子衿", "gender": "男声", "desc": "浑厚稳重", "emoji": "🧔"},
+    "zh-CN-YunyangNeural":  {"name": "闻笙", "gender": "男声", "desc": "清朗播报", "emoji": "👨"},
+    "zh-CN-XiaoxiaoNeural": {"name": "晓桉", "gender": "女声", "desc": "温暖亲切", "emoji": "👩"},
+    "zh-CN-XiaoyiNeural":   {"name": "晓柠", "gender": "女声", "desc": "活泼灵动", "emoji": "👧"},
 }
 DEFAULT_VOICE = "zh-CN-YunjianNeural"
 
