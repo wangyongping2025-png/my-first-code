@@ -70,36 +70,71 @@ def vtt_to_text(vtt_path: str) -> str:
     return "\n".join(deduped).strip()
 
 
+def _looks_like_bot_block(err: str) -> bool:
+    """判断错误是不是 YouTube 的『证明你不是机器人』拦截。"""
+    e = (err or "").lower()
+    return ("sign in to confirm" in e) or ("not a bot" in e) or ("cookies" in e)
+
+
+def _do_extract(url: str, tmp: str, cookies_browser):
+    """跑一次 yt-dlp 抓字幕。cookies_browser 可为 None 或 'chrome'/'safari' 等。"""
+    import yt_dlp
+    outtmpl = os.path.join(tmp, "%(id)s.%(ext)s")
+    ydl_opts = {
+        "skip_download": True,          # 不下载视频本身
+        "writesubtitles": True,         # 抓人工字幕
+        "writeautomaticsub": True,      # 抓 YouTube 自动生成的字幕
+        "subtitleslangs": LANG_PRIORITY,
+        "subtitlesformat": "vtt",
+        "outtmpl": outtmpl,
+        "quiet": True,
+        "no_warnings": True,
+    }
+    if cookies_browser:
+        # 借用浏览器里的 YouTube 登录身份，绕过『证明你不是机器人』
+        ydl_opts["cookiesfrombrowser"] = (cookies_browser,)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        return ydl.extract_info(url, download=True)
+
+
 def fetch_subtitle(url: str):
     """
     用 yt-dlp 抓字幕。
     返回 (成功?, 文字稿内容或错误信息, 视频标题, 用的是哪种语言)
     """
     try:
-        import yt_dlp
+        import yt_dlp  # noqa: F401
     except ImportError:
         return False, "缺少 yt-dlp 库，请先安装（见使用说明）。", None, None
 
     with tempfile.TemporaryDirectory() as tmp:
-        outtmpl = os.path.join(tmp, "%(id)s.%(ext)s")
-        ydl_opts = {
-            "skip_download": True,          # 不下载视频本身
-            "writesubtitles": True,         # 抓人工字幕
-            "writeautomaticsub": True,      # 抓 YouTube 自动生成的字幕
-            "subtitleslangs": LANG_PRIORITY,
-            "subtitlesformat": "vtt",
-            "outtmpl": outtmpl,
-            "quiet": True,
-            "no_warnings": True,
-        }
-
         title = None
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
+        last_err = None
+        info = None
+        # 依次尝试：① 不带登录身份 ② 借 Chrome 的登录身份 ③ 借 Safari 的登录身份
+        for browser in (None, "chrome", "safari"):
+            # 清掉上一次尝试可能留下的字幕文件
+            for f in glob.glob(os.path.join(tmp, "*.vtt")):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+            try:
+                info = _do_extract(url, tmp, browser)
                 title = info.get("title")
-        except Exception as e:
-            return False, f"抓取失败：{e}", None, None
+                last_err = None
+                break
+            except Exception as e:
+                last_err = str(e)
+                # 只有遇到『机器人拦截』才值得换浏览器登录身份再试；其它错误直接停
+                if _looks_like_bot_block(last_err):
+                    continue
+                break
+
+        if info is None:
+            if last_err and _looks_like_bot_block(last_err):
+                return False, "YOUTUBE_BOT", None, None
+            return False, f"抓取失败：{last_err}", None, None
 
         # 在临时目录里找下载到的 .vtt 字幕，按语言优先级挑一个
         vtt_files = glob.glob(os.path.join(tmp, "*.vtt"))
@@ -141,6 +176,16 @@ def extract():
         return jsonify({"ok": False, "msg": "请先粘贴一个 YouTube 视频链接。"})
 
     ok, result, title, lang = fetch_subtitle(url)
+
+    if not ok and result == "YOUTUBE_BOT":
+        return jsonify({
+            "ok": False,
+            "msg": "YouTube 要求『证明你不是机器人』，自动用浏览器身份也没通过。\n"
+                   "请这样做：\n"
+                   "1）用 Chrome 或 Safari 打开 youtube.com 并登录你的账号；\n"
+                   "2）保持登录状态，回到本页面再点一次「提取文案」。\n"
+                   "（工具会借用你浏览器里的 YouTube 登录身份来通过验证，只在你本地进行。）",
+        })
 
     if not ok and result == "NO_SUBTITLE":
         return jsonify({
