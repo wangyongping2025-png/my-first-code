@@ -252,7 +252,8 @@ def _do_download_audio(url: str, cookies_browser):
     import yt_dlp
     outtmpl = os.path.join(OUTPUT_DIR, "%(title).80s_%(id)s.%(ext)s")
     ydl_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",  # 只要音频，不要画面
+        # 优先纯音频；拿不到就退而求其次下个小视频(带声音)，Whisper 也能转
+        "format": "bestaudio[ext=m4a]/bestaudio/18/best[height<=480]/best",
         "outtmpl": outtmpl,
         "quiet": True,
         "no_warnings": True,
@@ -286,7 +287,7 @@ def fetch_audio(url: str):
 
     saw_bot = False
     saw_network = False
-    for browser in (None, "chrome", "safari"):
+    for browser in (None, "chrome"):  # Safari 的 cookie 读不了（权限），不试它
         info = None
         path = None
         err = None
