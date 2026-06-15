@@ -247,9 +247,106 @@ def fetch_subtitle(url: str):
         return False, "NO_SUBTITLE", title, None
 
 
+def _do_download_audio(url: str, cookies_browser):
+    """下载视频的音频文件到 outputs。返回 (info, 文件路径)。"""
+    import yt_dlp
+    outtmpl = os.path.join(OUTPUT_DIR, "%(title).80s_%(id)s.%(ext)s")
+    ydl_opts = {
+        "format": "bestaudio[ext=m4a]/bestaudio/best",  # 只要音频，不要画面
+        "outtmpl": outtmpl,
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "socket_timeout": 30,
+    }
+    proxy = get_proxy()
+    if proxy:
+        ydl_opts["proxy"] = proxy
+    if cookies_browser:
+        ydl_opts["cookiesfrombrowser"] = (cookies_browser,)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        rd = info.get("requested_downloads") or []
+        if rd and rd[0].get("filepath"):
+            return info, rd[0]["filepath"]
+        return info, ydl.prepare_filename(info)
+
+
+def fetch_audio(url: str):
+    """
+    下载音频（带代理、自动重试、必要时换登录身份）。
+    返回 (成功?, 文件名或错误标记, 视频标题)
+    """
+    try:
+        import yt_dlp  # noqa: F401
+    except ImportError:
+        return False, "缺少 yt-dlp 库，请先安装（见使用说明）。", None
+
+    saw_bot = False
+    saw_network = False
+    for browser in (None, "chrome", "safari"):
+        info = None
+        path = None
+        err = None
+        for _ in range(3):
+            try:
+                info, path = _do_download_audio(url, browser)
+                err = None
+                break
+            except Exception as e:
+                err = str(e)
+                if _looks_like_network(err) and not _looks_like_bot_block(err):
+                    saw_network = True
+                    time.sleep(2)
+                    continue
+                break
+        if info is None:
+            if err and _looks_like_bot_block(err):
+                saw_bot = True
+            continue
+        if path and os.path.exists(path):
+            return True, os.path.basename(path), info.get("title")
+        # 偶发：下载完但找不到文件，按文件名兜底找一下
+        vid = info.get("id") or ""
+        cands = glob.glob(os.path.join(OUTPUT_DIR, "*" + vid + "*"))
+        cands = [c for c in cands if not c.endswith((".txt", ".md"))]
+        if cands:
+            return True, os.path.basename(cands[0]), info.get("title")
+        return False, "音频下载完成但找不到文件，请重试一次。", info.get("title")
+
+    if saw_network:
+        return False, "NETWORK_ERROR", None
+    if saw_bot:
+        return False, "YOUTUBE_BOT", None
+    return False, "下载音频失败，请重试。", None
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/extract_audio", methods=["POST"])
+def extract_audio():
+    url = (request.json or {}).get("url", "").strip()
+    if not url:
+        return jsonify({"ok": False, "msg": "请先粘贴一个 YouTube 视频链接。"})
+
+    ok, result, title = fetch_audio(url)
+
+    if not ok and result == "NETWORK_ERROR":
+        return jsonify({"ok": False, "msg": "连 YouTube 的网络不稳定，自动重试多次还是断了。\n"
+                                            "请确认翻墙软件已连接、换个更稳的节点，再点一次。"})
+    if not ok and result == "YOUTUBE_BOT":
+        return jsonify({"ok": False, "msg": "YouTube 要求证明你不是机器人。请在 Chrome 里登录 YouTube 后再点一次。"})
+    if not ok:
+        return jsonify({"ok": False, "msg": result})
+
+    return jsonify({
+        "ok": True,
+        "title": title,
+        "audio_name": result,
+    })
 
 
 @app.route("/extract", methods=["POST"])

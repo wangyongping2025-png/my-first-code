@@ -39,9 +39,16 @@
     <div class="sub">粘贴视频链接 → 点按钮 → 抓出文字稿（优先中文，其次英文）。整理交给你自己的 Claude / GPT。</div>
 
     <input type="text" id="url" placeholder="在这里粘贴 YouTube 视频链接，例如 https://www.youtube.com/watch?v=...">
-    <button class="primary" id="go" onclick="run()">提取文案</button>
+    <button class="primary" id="go" onclick="run()">提取文案（有字幕用这个）</button>
+    <button class="primary" id="goAudio" onclick="runAudio()" style="background:#0b8043; margin-top:8px;">⬇️ 下载音频（没字幕用这个，喂给 Whisper 转文字）</button>
 
     <div id="status"></div>
+
+    <div class="card" id="audioCard" style="display:none;">
+      <div class="meta" id="audioMeta"></div>
+      <a class="act dl" id="audioDl" href="#" style="background:#0b8043;color:#fff;">⬇️ 下载这个音频文件</a>
+      <div class="tip">音频也已存到 outputs 文件夹。把它拖进你的 Whisper 软件（选简体中文）就能转成文字。</div>
+    </div>
 
     <div class="card" id="card">
       <div class="meta" id="meta"></div>
@@ -90,6 +97,45 @@ async function run() {
       document.getElementById('preview').textContent = data.preview +
         (data.chars > 1500 ? '\n\n…（这里只是预览，完整内容请复制或下载）' : '');
       card.style.display = 'block';
+    } else {
+      status.className='err';
+      status.textContent = '⚠️ ' + data.msg;
+    }
+  } catch (e) {
+    status.className='err';
+    status.textContent = '出错了：' + e + '\n（请确认这个窗口对应的程序还在运行）';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function runAudio() {
+  const url = document.getElementById('url').value.trim();
+  const status = document.getElementById('status');
+  const card = document.getElementById('card');
+  const aCard = document.getElementById('audioCard');
+  const btn = document.getElementById('goAudio');
+  card.style.display = 'none';
+  aCard.style.display = 'none';
+  if (!url) { status.className='err'; status.textContent='请先粘贴一个链接。'; return; }
+
+  btn.disabled = true;
+  status.className = '';
+  status.textContent = '正在下载音频，请稍等（按视频长短，可能要十几秒到一两分钟）…';
+
+  try {
+    const res = await fetch('/extract_audio', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({url})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      status.className='ok';
+      status.textContent='✅ 音频下载成功！';
+      document.getElementById('audioMeta').textContent = '标题：' + (data.title || '(未知)');
+      document.getElementById('audioDl').href = '/download/' + encodeURIComponent(data.audio_name);
+      aCard.style.display = 'block';
     } else {
       status.className='err';
       status.textContent = '⚠️ ' + data.msg;
