@@ -12,9 +12,41 @@ import datetime
 
 from flask import Flask, request, render_template, send_file, jsonify
 
-import organizer
-
 app = Flask(__name__)
+
+# 给你粘到 Claude / ChatGPT 用的整理指令（内容不经过任何云，整理在你自己的会员里做）
+ORGANIZE_INSTRUCTION = """请你帮我整理下面这段视频文字稿，按以下规则处理，并输出两部分内容。
+
+【轻度语言整理】
+1. 删除"啊、嗯、呃、好吧"等不承载信息的语气词。
+2. 删除口吃式或机械式重复（如"下滑、下滑""改革开放，改革开放"）。
+3. 合并完全相同、没有新增信息的重复语句。
+4. 删除"傻逼"这类不承载信息的侮辱性粗口，但必须保留该句的实际观点。
+5. 补全并纠正标点符号。
+6. 修复自动字幕造成的断句错误、错别字、同音字和明显识别错误。
+7. 调整不通顺的语序，使表达自然、逻辑连贯。
+
+【内容保留原则（最重要，不许偷工）】
+1. 只清理语言，不缩写内容；只优化表达，不删减信息。
+2. 必须保留人名、时间、数字、历史案例、观点、预测、论据和结论。
+3. 意思相近但包含新增信息的句子，必须保留。
+4. 不得因为观点重复、表达尖锐或有争议就删除有效内容。
+5. 与主线关系较弱但有信息的内容，移到文末"延伸讨论"，不得直接删除。
+6. 不要擅自总结、压缩或改变讲话者的原意和立场。
+7. 无法确认的内容不要编造，可保留并注明"（此处可能存在识别错误）"。
+8. 整理后正文原则上保留原文 85%–95% 的信息量；减少超过 15% 时请说明原因。
+
+【如果原文不是中文】请准确翻译成简体中文后再按上述规则整理。
+
+【Markdown 排版】
+1. 按主题划分章节、加准确简洁的小标题。
+2. 合理分段，避免大段堆积。
+3. 开头注明视频来源和整理说明。
+4. 重要原话可用引用格式（> ）。
+
+【处理记录】最后附一份简短的"删除与调整记录"，举几个代表性例子（原文 → 整理结果 → 原因）。
+
+下面是文字稿："""
 
 # 文字稿保存到这个文件夹（和本文件同目录下的 outputs）
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs")
@@ -201,50 +233,30 @@ def extract():
     if not ok:
         return jsonify({"ok": False, "msg": result})
 
-    raw_text = result  # 原始未整理文案
+    raw_text = result  # 抓到的原始文字稿
 
-    # 调用 Claude 智能整理
-    ok2, md, changelog = organizer.organize(raw_text, title, url, lang)
-
-    if not ok2 and md == "NO_API_KEY":
-        return jsonify({
-            "ok": False,
-            "msg": "字幕已经抓到了，但还没法整理：没有找到 DeepSeek 的 API key。\n"
-                   "请把你的 key 粘贴到 wenan 文件夹里的 apikey.txt 文件中（见使用说明），再点一次。",
-        })
-    if not ok2:
-        return jsonify({"ok": False, "msg": "字幕抓到了，但整理这一步出错：\n" + md})
-
-    # 保存三个文件：原始 txt、整理 md、处理记录 md
+    # 不上传任何云：只把原始文字稿存成 txt，并拼好一份"整理指令+文字稿"供你粘到 Claude / GPT
     base = clean_filename(title or "transcript")
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    raw_name = f"{base}_原始_{stamp}.txt"
-    md_name = f"{base}_整理_{stamp}.md"
-    log_name = f"{base}_处理记录_{stamp}.md"
-
+    raw_name = f"{base}_文字稿_{stamp}.txt"
     with open(os.path.join(OUTPUT_DIR, raw_name), "w", encoding="utf-8") as f:
         f.write(raw_text)
-    with open(os.path.join(OUTPUT_DIR, md_name), "w", encoding="utf-8") as f:
-        f.write(md)
-    with open(os.path.join(OUTPUT_DIR, log_name), "w", encoding="utf-8") as f:
-        f.write(changelog)
 
-    raw_chars = len(raw_text)
-    md_chars = len(md)
-    ratio = round(md_chars / raw_chars * 100) if raw_chars else 0
+    paste_package = (
+        ORGANIZE_INSTRUCTION
+        + f"\n\n视频标题：{title or '(未知)'}\n视频链接：{url}\n\n"
+        + raw_text
+    )
 
     return jsonify({
         "ok": True,
         "title": title,
         "lang": lang,
-        "raw_chars": raw_chars,
-        "md_chars": md_chars,
-        "ratio": ratio,
+        "chars": len(raw_text),
         "raw_name": raw_name,
-        "md_name": md_name,
-        "log_name": log_name,
-        "preview": md[:1800],
-        "save_dir": OUTPUT_DIR,
+        "raw_text": raw_text,
+        "paste": paste_package,
+        "preview": raw_text[:1500],
     })
 
 

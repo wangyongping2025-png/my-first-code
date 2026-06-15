@@ -13,41 +13,52 @@
     .sub { color:#888; font-size:13px; margin-bottom:22px; }
     input[type=text] { width:100%; box-sizing:border-box; padding:13px 14px;
            font-size:15px; border:1px solid #d6d9de; border-radius:9px; }
-    button { margin-top:14px; width:100%; padding:13px; font-size:16px; border:none;
+    button.primary { margin-top:14px; width:100%; padding:13px; font-size:16px; border:none;
            border-radius:9px; background:#2563eb; color:#fff; cursor:pointer; }
-    button:disabled { background:#9bb4ee; cursor:not-allowed; }
+    button.primary:disabled { background:#9bb4ee; cursor:not-allowed; }
     #status { margin-top:18px; font-size:14px; white-space:pre-wrap; line-height:1.6; }
     .err { color:#c0392b; }
     .ok  { color:#137333; }
     .card { margin-top:18px; border:1px solid #e6e8eb; border-radius:10px; padding:16px;
             background:#fafbfc; display:none; }
-    .meta { font-size:13px; color:#555; margin-bottom:10px; }
+    .meta { font-size:13px; color:#555; margin-bottom:12px; }
+    .btnrow { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .act { padding:10px 14px; border:none; border-radius:8px; font-size:14px; cursor:pointer; }
+    .act.copy { background:#137333; color:#fff; }
+    .act.copy2 { background:#0b66c3; color:#fff; }
+    .act.dl { background:#eef1f4; color:#222; text-decoration:none; display:inline-block; }
     pre { white-space:pre-wrap; word-break:break-word; font-size:13px; line-height:1.6;
           max-height:320px; overflow:auto; background:#fff; padding:12px; border-radius:8px;
           border:1px solid #eee; margin:0; }
-    a.dl { display:inline-block; margin-top:12px; padding:10px 16px; background:#137333;
-           color:#fff; text-decoration:none; border-radius:8px; font-size:14px; }
+    .tip { font-size:12px; color:#888; margin:8px 0 0; }
   </style>
 </head>
 <body>
   <div class="box">
     <h1>🎬 YouTube 文案提取</h1>
-    <div class="sub">粘贴视频链接 → 点按钮 → 得到文字稿（优先中文，其次英文）</div>
+    <div class="sub">粘贴视频链接 → 点按钮 → 抓出文字稿（优先中文，其次英文）。整理交给你自己的 Claude / GPT。</div>
 
     <input type="text" id="url" placeholder="在这里粘贴 YouTube 视频链接，例如 https://www.youtube.com/watch?v=...">
-    <button id="go" onclick="run()">提取文案</button>
+    <button class="primary" id="go" onclick="run()">提取文案</button>
 
     <div id="status"></div>
 
     <div class="card" id="card">
       <div class="meta" id="meta"></div>
-      <div id="downloads" style="margin-bottom:12px;"></div>
-      <div style="font-size:13px;color:#555;margin-bottom:6px;">整理后预览：</div>
+      <div class="btnrow">
+        <button class="act copy2" id="copyPack" onclick="copyText('pack', this)">📋 复制（整理指令＋文字稿）</button>
+        <button class="act copy" id="copyRaw" onclick="copyText('raw', this)">📄 只复制文字稿</button>
+        <a class="act dl" id="dl" href="#">⬇️ 下载 txt</a>
+      </div>
+      <div class="tip">把「整理指令＋文字稿」粘到你的 Claude 或 ChatGPT 对话框，发送，整理好的文案就出来了。</div>
+      <div style="font-size:13px;color:#555;margin:14px 0 6px;">文字稿预览：</div>
       <pre id="preview"></pre>
     </div>
   </div>
 
 <script>
+let LAST = { raw: "", pack: "" };
+
 async function run() {
   const url = document.getElementById('url').value.trim();
   const status = document.getElementById('status');
@@ -58,7 +69,7 @@ async function run() {
 
   btn.disabled = true;
   status.className = '';
-  status.textContent = '正在抓字幕 + AI 整理，请稍等（整理可能要十几秒到一分钟）…';
+  status.textContent = '正在抓取文字稿，请稍等（第一次可能慢一点）…';
 
   try {
     const res = await fetch('/extract', {
@@ -70,18 +81,14 @@ async function run() {
 
     if (data.ok) {
       status.className='ok';
-      status.textContent='✅ 提取并整理完成！文件也已存到 outputs 文件夹。';
+      status.textContent='✅ 抓取成功！txt 也已存到 outputs 文件夹。';
       document.getElementById('meta').innerHTML =
-        `标题：${data.title || '(未知)'}　|　字幕语言：${data.lang}<br>` +
-        `原文 ${data.raw_chars} 字　→　整理后 ${data.md_chars} 字　|　内容保留约 ${data.ratio}%`;
-      const dl = (name, label) =>
-        `<a class="dl" style="margin-right:8px" href="/download/${encodeURIComponent(name)}">${label}</a>`;
-      document.getElementById('downloads').innerHTML =
-        dl(data.md_name, '⬇️ 整理后 Markdown') +
-        dl(data.raw_name, '⬇️ 原始 txt') +
-        dl(data.log_name, '⬇️ 处理记录');
+        `标题：${data.title || '(未知)'}　|　字幕语言：${data.lang}　|　共 ${data.chars} 字`;
+      LAST.raw = data.raw_text || "";
+      LAST.pack = data.paste || "";
+      document.getElementById('dl').href = '/download/' + encodeURIComponent(data.raw_name);
       document.getElementById('preview').textContent = data.preview +
-        (data.md_chars > 1800 ? '\n\n…（仅预览，完整内容请下载文件）' : '');
+        (data.chars > 1500 ? '\n\n…（这里只是预览，完整内容请复制或下载）' : '');
       card.style.display = 'block';
     } else {
       status.className='err';
@@ -93,6 +100,23 @@ async function run() {
   } finally {
     btn.disabled = false;
   }
+}
+
+async function copyText(which, el) {
+  const text = which === 'pack' ? LAST.pack : LAST.raw;
+  if (!text) return;
+  const old = el.textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    el.textContent = '✅ 已复制';
+  } catch (e) {
+    // 退一步：用老办法复制
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    el.textContent = '✅ 已复制';
+  }
+  setTimeout(() => { el.textContent = old; }, 1500);
 }
 </script>
 </body>
