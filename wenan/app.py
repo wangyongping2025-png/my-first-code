@@ -7,6 +7,7 @@ YouTube 文案提取小工具 —— 第一步：有字幕就直接抓字幕
 import os
 import re
 import glob
+import time
 import tempfile
 import datetime
 
@@ -102,10 +103,39 @@ def vtt_to_text(vtt_path: str) -> str:
     return "\n".join(deduped).strip()
 
 
+# 翻墙软件的本地代理（鸟云加速：127.0.0.1:6376）。端口变了就在 wenan 里建 proxy.txt 改。
+DEFAULT_PROXY = "http://127.0.0.1:6376"
+
+
+def get_proxy():
+    """优先读 proxy.txt，否则用默认代理。返回形如 http://127.0.0.1:6376，写 none 表示不走代理。"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    f = os.path.join(here, "proxy.txt")
+    val = ""
+    if os.path.exists(f):
+        with open(f, "r", encoding="utf-8") as fp:
+            val = fp.read().strip()
+    if not val:
+        val = DEFAULT_PROXY
+    if val.lower() in ("none", "no", "off", "关闭", "不走代理"):
+        return None
+    if "://" not in val:
+        val = "http://" + val
+    return val
+
+
 def _looks_like_bot_block(err: str) -> bool:
     """判断错误是不是 YouTube 的『证明你不是机器人』拦截。"""
     e = (err or "").lower()
-    return ("sign in to confirm" in e) or ("not a bot" in e) or ("cookies" in e)
+    return ("sign in to confirm" in e) or ("not a bot" in e) or ("--cookies" in e)
+
+
+def _looks_like_network(err: str) -> bool:
+    """判断错误是不是线路/网络抖动（值得重试）。"""
+    e = (err or "").lower()
+    keys = ("ssl", "eof", "timed out", "timeout", "connection", "unable to download",
+            "getaddrinfo", "reset by peer", "read operation", "proxy", "tunnel", "10054", "broken pipe")
+    return any(k in e for k in keys)
 
 
 def _do_extract(url: str, tmp: str, cookies_browser):
@@ -123,12 +153,39 @@ def _do_extract(url: str, tmp: str, cookies_browser):
         "no_warnings": True,
         # 我们只要字幕，不下载视频画面；挑不到视频格式也不影响抓字幕
         "ignore_no_formats_error": True,
+        "socket_timeout": 30,
     }
+    proxy = get_proxy()
+    if proxy:
+        # 固定走你的翻墙软件本地代理，避免系统路由不稳导致 SSL 断开
+        ydl_opts["proxy"] = proxy
     if cookies_browser:
         # 借用浏览器里的 YouTube 登录身份，绕过『证明你不是机器人』
         ydl_opts["cookiesfrombrowser"] = (cookies_browser,)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=True)
+
+
+def _pick_subtitle_text(tmp: str):
+    """从临时目录里按语言优先级挑一个字幕，返回 (文字, 语言)，没有就 (None, None)。"""
+    vtt_files = glob.glob(os.path.join(tmp, "*.vtt"))
+    if not vtt_files:
+        return None, None
+    chosen = None
+    chosen_lang = None
+    for lang in LANG_PRIORITY:
+        for vf in vtt_files:
+            if re.search(r"\." + re.escape(lang) + r"\.vtt$", vf):
+                chosen = vf
+                chosen_lang = lang
+                break
+        if chosen:
+            break
+    if not chosen:
+        chosen = vtt_files[0]
+        m = re.search(r"\.([^.]+)\.vtt$", os.path.basename(chosen))
+        chosen_lang = m.group(1) if m else "未知"
+    return vtt_to_text(chosen), chosen_lang
 
 
 def fetch_subtitle(url: str):
@@ -143,59 +200,51 @@ def fetch_subtitle(url: str):
 
     with tempfile.TemporaryDirectory() as tmp:
         title = None
-        last_err = None
-        info = None
-        # 依次尝试：① 不带登录身份 ② 借 Chrome 的登录身份 ③ 借 Safari 的登录身份
+        saw_bot = False
+        saw_network = False
+        got_info = False
+
+        # 依次用 ① 不带登录身份 ② Chrome 登录身份 ③ Safari 登录身份；哪个先拿到字幕就用哪个
         for browser in (None, "chrome", "safari"):
-            # 清掉上一次尝试可能留下的字幕文件
-            for f in glob.glob(os.path.join(tmp, "*.vtt")):
+            info = None
+            err = None
+            # 线路抖动就重试，每个身份最多试 3 次
+            for _ in range(3):
+                for f in glob.glob(os.path.join(tmp, "*.vtt")):
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        pass
                 try:
-                    os.remove(f)
-                except OSError:
-                    pass
-            try:
-                info = _do_extract(url, tmp, browser)
-                title = info.get("title")
-                last_err = None
-                break
-            except Exception as e:
-                last_err = str(e)
-                # 只有遇到『机器人拦截』才值得换浏览器登录身份再试；其它错误直接停
-                if _looks_like_bot_block(last_err):
-                    continue
-                break
-
-        if info is None:
-            if last_err and _looks_like_bot_block(last_err):
-                return False, "YOUTUBE_BOT", None, None
-            return False, f"抓取失败：{last_err}", None, None
-
-        # 在临时目录里找下载到的 .vtt 字幕，按语言优先级挑一个
-        vtt_files = glob.glob(os.path.join(tmp, "*.vtt"))
-        if not vtt_files:
-            return False, "NO_SUBTITLE", title, None
-
-        chosen = None
-        chosen_lang = None
-        for lang in LANG_PRIORITY:
-            for vf in vtt_files:
-                # 文件名形如  videoid.zh-Hans.vtt
-                if re.search(r"\." + re.escape(lang) + r"\.vtt$", vf):
-                    chosen = vf
-                    chosen_lang = lang
+                    info = _do_extract(url, tmp, browser)
+                    err = None
                     break
-            if chosen:
-                break
-        if not chosen:
-            chosen = vtt_files[0]
-            m = re.search(r"\.([^.]+)\.vtt$", os.path.basename(chosen))
-            chosen_lang = m.group(1) if m else "未知"
+                except Exception as e:
+                    err = str(e)
+                    if _looks_like_network(err) and not _looks_like_bot_block(err):
+                        saw_network = True
+                        time.sleep(2)
+                        continue  # 线路抖动，重试同一身份
+                    break  # 机器人拦截或其它错误，换下一个身份
 
-        text = vtt_to_text(chosen)
-        if not text:
-            return False, "字幕文件是空的，可能这个视频没有可用文字。", title, chosen_lang
+            if info is None:
+                if err and _looks_like_bot_block(err):
+                    saw_bot = True
+                continue  # 换下一个登录身份
 
-        return True, text, title, chosen_lang
+            got_info = True
+            title = info.get("title") or title
+            text, lang = _pick_subtitle_text(tmp)
+            if text:
+                return True, text, title, lang
+            # 这个身份没拿到字幕，换下一个身份再试
+
+        # 三种身份都试完，仍没字幕
+        if not got_info and saw_network:
+            return False, "NETWORK_ERROR", title, None
+        if not got_info and saw_bot:
+            return False, "YOUTUBE_BOT", title, None
+        return False, "NO_SUBTITLE", title, None
 
 
 @app.route("/")
@@ -210,6 +259,14 @@ def extract():
         return jsonify({"ok": False, "msg": "请先粘贴一个 YouTube 视频链接。"})
 
     ok, result, title, lang = fetch_subtitle(url)
+
+    if not ok and result == "NETWORK_ERROR":
+        return jsonify({
+            "ok": False,
+            "msg": "连 YouTube 的网络不稳定，自动重试多次还是断了。\n"
+                   "请确认翻墙软件已连接、换个更稳的节点，再点一次「提取文案」。\n"
+                   "（工具已自动走你的代理 127.0.0.1:6376；如果你的代理端口变了，把新端口写进 wenan 文件夹里的 proxy.txt。）",
+        })
 
     if not ok and result == "YOUTUBE_BOT":
         return jsonify({
