@@ -212,7 +212,7 @@ def download(filename):
 if __name__ == "__main__":
     print("=" * 50)
     print("文案提取小工具已启动！")
-    print("请在浏览器打开： http://127.0.0.1:5000")
+    print("请在浏览器打开： http://127.0.0.1:5050")
     print("关闭工具：回到这个窗口按 Control + C")
     print("=" * 50)
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    app.run(host="127.0.0.1", port=5050, debug=False)
