@@ -89,6 +89,8 @@ def _do_extract(url: str, tmp: str, cookies_browser):
         "outtmpl": outtmpl,
         "quiet": True,
         "no_warnings": True,
+        # 我们只要字幕，不下载视频画面；挑不到视频格式也不影响抓字幕
+        "ignore_no_formats_error": True,
     }
     if cookies_browser:
         # 借用浏览器里的 YouTube 登录身份，绕过『证明你不是机器人』
