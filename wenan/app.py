@@ -162,7 +162,7 @@ def extract():
     if not ok2 and md == "NO_API_KEY":
         return jsonify({
             "ok": False,
-            "msg": "字幕已经抓到了，但还没法整理：没有找到 Claude 的 API key。\n"
+            "msg": "字幕已经抓到了，但还没法整理：没有找到 DeepSeek 的 API key。\n"
                    "请把你的 key 粘贴到 wenan 文件夹里的 apikey.txt 文件中（见使用说明），再点一次。",
         })
     if not ok2:

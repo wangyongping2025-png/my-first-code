@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-整理模块：把抓到的原始文案，按用户那套规则用 Claude 智能整理。
+整理模块：把抓到的原始文案，按用户那套规则用 DeepSeek 智能整理。
 产出：整理好的 Markdown 正文 + 一份「删除与调整记录」。
-用最强的模型 claude-opus-4-8。
+DeepSeek 在国内可直接使用，支付宝/微信充值，中文整理质量好。
 """
 
 import os
 
-MODEL = "claude-opus-4-8"
+# DeepSeek 的接口地址和模型（deepseek-chat = DeepSeek-V3，速度快、便宜、中文好）
+BASE_URL = "https://api.deepseek.com"
+MODEL = "deepseek-chat"
 
 # 整理规则（完全对应你文档里的「二、整理规则」）写成给 AI 的系统指令
 SYSTEM_PROMPT = """你是一个中文视频文案整理专家。用户会给你一段视频的原始文字稿（可能来自人工字幕或自动字幕），\
@@ -68,23 +70,24 @@ def get_api_key():
             key = fp.read().strip()
             if key:
                 return key
-    return os.environ.get("ANTHROPIC_API_KEY")
+    return os.environ.get("DEEPSEEK_API_KEY")
 
 
 def organize(raw_text: str, title: str, url: str, lang: str):
     """
-    调用 Claude 整理。返回 (成功?, markdown或错误信息, changelog)
+    调用 DeepSeek 整理。返回 (成功?, markdown或错误信息, changelog)
     """
     key = get_api_key()
     if not key:
         return False, "NO_API_KEY", None
 
     try:
-        import anthropic
+        from openai import OpenAI
+        import openai as openai_pkg
     except ImportError:
-        return False, "缺少 anthropic 库，请先安装（见使用说明）。", None
+        return False, "缺少 openai 库，请先安装（见使用说明）。", None
 
-    client = anthropic.Anthropic(api_key=key)
+    client = OpenAI(api_key=key, base_url=BASE_URL, timeout=600)
 
     user_msg = (
         f"视频标题：{title or '(未知)'}\n"
@@ -94,29 +97,27 @@ def organize(raw_text: str, title: str, url: str, lang: str):
     )
 
     try:
-        # 整理后的内容可能很长，用流式 + 取最终结果，避免超时
-        with client.messages.stream(
+        resp = client.chat.completions.create(
             model=MODEL,
-            max_tokens=32000,
-            thinking={"type": "adaptive"},
-            output_config={"effort": "high"},
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_msg}],
-        ) as stream:
-            final = stream.get_final_message()
-    except anthropic.AuthenticationError:
+            max_tokens=8192,           # DeepSeek 单次最多输出 8192
+            temperature=0.3,           # 稍低，整理任务更稳
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+        )
+    except openai_pkg.AuthenticationError:
         return False, "API key 无效或填错了，请检查 apikey.txt 里粘贴的密钥。", None
-    except anthropic.PermissionDeniedError:
-        return False, "这个 API key 没有权限，或账户还没充值。请到 console.anthropic.com 的 Billing 充值。", None
-    except anthropic.RateLimitError:
-        return False, "请求太频繁，被限流了。等几十秒再试一次。", None
-    except anthropic.APIConnectionError:
-        return False, "连不上 Claude 服务器，请检查网络后重试。", None
+    except openai_pkg.PermissionDeniedError:
+        return False, "这个 API key 没有权限，或账户还没充值。请到 platform.deepseek.com 充值。", None
+    except openai_pkg.RateLimitError:
+        return False, "请求太频繁或余额不足，被限流了。等几十秒再试，或检查账户余额。", None
+    except openai_pkg.APIConnectionError:
+        return False, "连不上 DeepSeek 服务器，请检查网络后重试。", None
     except Exception as e:
         return False, f"整理失败：{e}", None
 
-    # 取出文本
-    text = "".join(b.text for b in final.content if b.type == "text").strip()
+    text = (resp.choices[0].message.content or "").strip()
 
     # 按分隔标记切成 markdown 和 changelog 两部分
     if "===CHANGELOG===" in text:
