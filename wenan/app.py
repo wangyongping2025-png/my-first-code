@@ -258,6 +258,8 @@ def _do_download_audio(url: str, cookies_browser):
         "no_warnings": True,
         "noplaylist": True,
         "socket_timeout": 30,
+        # 换多种客户端身份（电视端/手机端等），绕过 YouTube 对下载的『证明你不是机器人』拦截
+        "extractor_args": {"youtube": {"player_client": ["tv", "web_safari", "mweb", "ios", "android_vr", "web"]}},
     }
     proxy = get_proxy()
     if proxy:
