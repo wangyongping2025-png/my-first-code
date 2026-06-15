@@ -41,8 +41,9 @@
 
     <div class="card" id="card">
       <div class="meta" id="meta"></div>
+      <div id="downloads" style="margin-bottom:12px;"></div>
+      <div style="font-size:13px;color:#555;margin-bottom:6px;">整理后预览：</div>
       <pre id="preview"></pre>
-      <a class="dl" id="dl" href="#">⬇️ 下载完整 txt 文件</a>
     </div>
   </div>
 
@@ -57,7 +58,7 @@ async function run() {
 
   btn.disabled = true;
   status.className = '';
-  status.textContent = '正在抓取字幕，请稍等（第一次可能慢一点）…';
+  status.textContent = '正在抓字幕 + AI 整理，请稍等（整理可能要十几秒到一分钟）…';
 
   try {
     const res = await fetch('/extract', {
@@ -69,13 +70,18 @@ async function run() {
 
     if (data.ok) {
       status.className='ok';
-      status.textContent='✅ 提取成功！';
-      document.getElementById('meta').textContent =
-        `标题：${data.title || '(未知)'}　|　字幕语言：${data.lang}　|　共 ${data.chars} 字`;
+      status.textContent='✅ 提取并整理完成！文件也已存到 outputs 文件夹。';
+      document.getElementById('meta').innerHTML =
+        `标题：${data.title || '(未知)'}　|　字幕语言：${data.lang}<br>` +
+        `原文 ${data.raw_chars} 字　→　整理后 ${data.md_chars} 字　|　内容保留约 ${data.ratio}%`;
+      const dl = (name, label) =>
+        `<a class="dl" style="margin-right:8px" href="/download/${encodeURIComponent(name)}">${label}</a>`;
+      document.getElementById('downloads').innerHTML =
+        dl(data.md_name, '⬇️ 整理后 Markdown') +
+        dl(data.raw_name, '⬇️ 原始 txt') +
+        dl(data.log_name, '⬇️ 处理记录');
       document.getElementById('preview').textContent = data.preview +
-        (data.chars > 1500 ? '\n\n…（这里只是预览，完整内容请下载 txt）' : '');
-      const dl = document.getElementById('dl');
-      dl.href = '/download/' + encodeURIComponent(data.filename);
+        (data.md_chars > 1800 ? '\n\n…（仅预览，完整内容请下载文件）' : '');
       card.style.display = 'block';
     } else {
       status.className='err';

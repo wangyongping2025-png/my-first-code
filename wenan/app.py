@@ -12,6 +12,8 @@ import datetime
 
 from flask import Flask, request, render_template, send_file, jsonify
 
+import organizer
+
 app = Flask(__name__)
 
 # 文字稿保存到这个文件夹（和本文件同目录下的 outputs）
@@ -152,20 +154,50 @@ def extract():
     if not ok:
         return jsonify({"ok": False, "msg": result})
 
-    # 保存成 txt 文件
+    raw_text = result  # 原始未整理文案
+
+    # 调用 Claude 智能整理
+    ok2, md, changelog = organizer.organize(raw_text, title, url, lang)
+
+    if not ok2 and md == "NO_API_KEY":
+        return jsonify({
+            "ok": False,
+            "msg": "字幕已经抓到了，但还没法整理：没有找到 Claude 的 API key。\n"
+                   "请把你的 key 粘贴到 wenan 文件夹里的 apikey.txt 文件中（见使用说明），再点一次。",
+        })
+    if not ok2:
+        return jsonify({"ok": False, "msg": "字幕抓到了，但整理这一步出错：\n" + md})
+
+    # 保存三个文件：原始 txt、整理 md、处理记录 md
+    base = clean_filename(title or "transcript")
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    fname = f"{clean_filename(title or 'transcript')}_{stamp}.txt"
-    fpath = os.path.join(OUTPUT_DIR, fname)
-    with open(fpath, "w", encoding="utf-8") as f:
-        f.write(result)
+    raw_name = f"{base}_原始_{stamp}.txt"
+    md_name = f"{base}_整理_{stamp}.md"
+    log_name = f"{base}_处理记录_{stamp}.md"
+
+    with open(os.path.join(OUTPUT_DIR, raw_name), "w", encoding="utf-8") as f:
+        f.write(raw_text)
+    with open(os.path.join(OUTPUT_DIR, md_name), "w", encoding="utf-8") as f:
+        f.write(md)
+    with open(os.path.join(OUTPUT_DIR, log_name), "w", encoding="utf-8") as f:
+        f.write(changelog)
+
+    raw_chars = len(raw_text)
+    md_chars = len(md)
+    ratio = round(md_chars / raw_chars * 100) if raw_chars else 0
 
     return jsonify({
         "ok": True,
         "title": title,
         "lang": lang,
-        "filename": fname,
-        "chars": len(result),
-        "preview": result[:1500],
+        "raw_chars": raw_chars,
+        "md_chars": md_chars,
+        "ratio": ratio,
+        "raw_name": raw_name,
+        "md_name": md_name,
+        "log_name": log_name,
+        "preview": md[:1800],
+        "save_dir": OUTPUT_DIR,
     })
 
 
