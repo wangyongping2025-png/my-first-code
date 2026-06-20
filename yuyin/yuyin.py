@@ -280,9 +280,9 @@ if _HAVE_COCOA:
 
         def buildPanel(self):
             scr = NSScreen.mainScreen().frame()
-            w, h = 240.0, 60.0
+            w, h = 148.0, 38.0
             x = (scr.size.width - w) / 2.0
-            y = 150.0  # 距屏幕底部的高度
+            y = 90.0  # 距屏幕底部的高度（更靠下，少挡视线）
             rect = NSMakeRect(x, y, w, h)
             style = _NSWindowStyleMaskBorderless | _NSWindowStyleMaskNonactivatingPanel
             panel = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -298,15 +298,15 @@ if _HAVE_COCOA:
             content = panel.contentView()
             content.setWantsLayer_(True)
             layer = content.layer()
-            layer.setCornerRadius_(18.0)
+            layer.setCornerRadius_(h / 2.0)               # 半高圆角 = 胶囊形
             layer.setBackgroundColor_(
                 NSColor.colorWithCalibratedRed_green_blue_alpha_(
-                    0.0, 0.0, 0.0, 0.82
+                    0.0, 0.0, 0.0, 0.85
                 ).CGColor()
             )
 
             label = NSTextField.alloc().initWithFrame_(
-                NSMakeRect(0, (h - 28) / 2.0, w, 28)
+                NSMakeRect(0, (h - 20) / 2.0, w, 20)
             )
             label.setBezeled_(False)
             label.setDrawsBackground_(False)
@@ -314,7 +314,7 @@ if _HAVE_COCOA:
             label.setSelectable_(False)
             label.setAlignment_(NSTextAlignmentCenter)
             label.setTextColor_(NSColor.whiteColor())
-            label.setFont_(NSFont.systemFontOfSize_(18.0))
+            label.setFont_(NSFont.systemFontOfSize_(13.0))
             content.addSubview_(label)
 
             panel.orderOut_(None)  # 初始隐藏
@@ -328,10 +328,10 @@ if _HAVE_COCOA:
                 return
             self.last = status
             if status == "recording":
-                self.label.setStringValue_(u"🔴  正在录音…")
+                self.label.setStringValue_(u"🔴 正在录音")
                 self.panel.orderFrontRegardless()
             elif status == "transcribing":
-                self.label.setStringValue_(u"✍️  识别中…")
+                self.label.setStringValue_(u"✍️ 识别中…")
                 self.panel.orderFrontRegardless()
             else:
                 self.panel.orderOut_(None)
