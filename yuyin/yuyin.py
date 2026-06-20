@@ -619,6 +619,12 @@ def main():
         _list_devices()
         return
 
+    # --video：从 BlackHole 录"电脑播放的声音"（视频/音频转文字），
+    # 不加就是默认麦克风（你自己口述）。这样不用每次改配置文件。
+    if "--video" in sys.argv:
+        global INPUT_DEVICE
+        INPUT_DEVICE = "BlackHole"
+
     typer = VoiceTyper()
     listener = keyboard.Listener(on_press=typer.on_press)
     listener.start()
