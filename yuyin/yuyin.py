@@ -50,8 +50,9 @@ TRIGGER_KEYS = {keyboard.Key.alt_r}
 LANGUAGE = "zh"
 
 # 模型大小：tiny / base / small / medium / large-v3
-# medium：标点和准确度比 small 明显更好，8G 内存可跑，每句慢 1~2 秒。
-MODEL_SIZE = "medium"
+# small：在 8G、纯 CPU 的 Mac 上能基本「实时跟上」，流式不积压、停了即停。
+# medium 更准但慢约 3~4 倍，长录音会积压卡顿，不适合实时流式。
+MODEL_SIZE = "small"
 
 # 计算精度。Apple Silicon / CPU 用 "int8" 兼容性最好、占用最低。
 COMPUTE_TYPE = "int8"
@@ -230,8 +231,10 @@ class VoiceTyper:
         self._beep("Pop")  # 「啵」：结束录音
 
         if STREAMING:
-            # 通知 worker 把最后一段收尾，状态由 worker 结束时置回 idle
-            self._audio_q.put(None)
+            # 录音已停，但后台可能还在追赶识别没转完的部分，
+            # 状态改为「识别中」，worker 全部转完后再置回 idle。
+            self.status = "transcribing"
+            self._audio_q.put(None)  # 通知 worker 把最后一段收尾
             return
 
         # —— 批量模式（STREAMING=False 时走这里）——
