@@ -74,6 +74,10 @@ SHOW_KEYS = False
 # 这样不用盯着终端，在任何软件里靠声音就知道状态。
 SOUND_FEEDBACK = True
 
+# 屏幕浮动提示：录音/识别时在屏幕底部中间显示一个悬浮小条（像 Typeless）。
+# 这样不用看终端就知道当前状态。
+SHOW_OVERLAY = True
+
 # ====================================================
 
 
@@ -90,6 +94,9 @@ class VoiceTyper:
         self._kb = keyboard.Controller()
         # 标记触发键当前是否处于按下状态，用来过滤长按时系统连发的重复事件
         self._key_down = False
+        # 当前状态："idle" 空闲 / "recording" 录音中 / "transcribing" 识别中
+        # 浮动提示窗口靠读这个值来决定显示什么
+        self.status = "idle"
 
     # ---------- 录音 ----------
 
@@ -126,6 +133,7 @@ class VoiceTyper:
                 callback=self._audio_callback,
             )
             self._stream.start()
+            self.status = "recording"
             self._beep("Tink")  # 「叮」：开始录音
             print("🎙️  正在录音...（再按一下结束）")
 
@@ -141,27 +149,30 @@ class VoiceTyper:
             self._frames = []
 
         self._beep("Pop")  # 「啵」：结束录音、开始识别
-
-        if not frames:
-            print("没有录到声音。")
-            return
-
-        audio = np.concatenate(frames, axis=0).flatten().astype(np.float32)
-        duration = len(audio) / SAMPLE_RATE
-        if duration < 0.3:
-            print("录音太短，已忽略。")
-            return
-
-        print(f"🧠  识别中...（{duration:.1f} 秒音频）")
-
-        # 调试模式：临时存个 wav 方便检查，识别完在 finally 里删掉
-        debug_path = self._save_debug_wav(audio) if DEBUG_SAVE_AUDIO else None
+        self.status = "transcribing"
         try:
-            self._transcribe(audio)
+            if not frames:
+                print("没有录到声音。")
+                return
+
+            audio = np.concatenate(frames, axis=0).flatten().astype(np.float32)
+            duration = len(audio) / SAMPLE_RATE
+            if duration < 0.3:
+                print("录音太短，已忽略。")
+                return
+
+            print(f"🧠  识别中...（{duration:.1f} 秒音频）")
+
+            # 调试模式：临时存个 wav 方便检查，识别完在 finally 里删掉
+            debug_path = self._save_debug_wav(audio) if DEBUG_SAVE_AUDIO else None
+            try:
+                self._transcribe(audio)
+            finally:
+                if debug_path and os.path.exists(debug_path):
+                    os.remove(debug_path)
+                    print(f"🧹  已删除临时音频：{debug_path}")
         finally:
-            if debug_path and os.path.exists(debug_path):
-                os.remove(debug_path)
-                print(f"🧹  已删除临时音频：{debug_path}")
+            self.status = "idle"
 
     def _save_debug_wav(self, audio):
         # float32(-1~1) 转 int16 写入 wav，仅供调试回放
@@ -236,21 +247,136 @@ class VoiceTyper:
         if key in TRIGGER_KEYS:
             self._key_down = False
 
-    def run(self):
-        print("=" * 48)
-        print(f"  本地语音转文字已就绪")
-        print(f"  按一下「右 Option」开始录音，再按一下结束并识别")
-        print(f"  按 Ctrl+C 退出")
-        print("=" * 48)
-        with keyboard.Listener(
-            on_press=self.on_press, on_release=self.on_release
-        ) as listener:
-            listener.join()
+# ============ 屏幕浮动提示（像 Typeless 的悬浮小条，用 macOS 原生窗口实现）============
+
+# pyobjc 已随 pynput 一起装好。若导入失败则自动退回「无窗口」模式。
+try:
+    import objc  # noqa: F401
+    from Foundation import NSObject, NSTimer, NSMakeRect
+    from AppKit import (
+        NSApplication,
+        NSPanel,
+        NSColor,
+        NSTextField,
+        NSScreen,
+        NSFont,
+        NSBackingStoreBuffered,
+        NSStatusWindowLevel,
+        NSTextAlignmentCenter,
+        NSApplicationActivationPolicyAccessory,
+    )
+
+    _NSWindowStyleMaskBorderless = 0
+    _NSWindowStyleMaskNonactivatingPanel = 1 << 7
+    _HAVE_COCOA = True
+except Exception:
+    _HAVE_COCOA = False
+
+
+if _HAVE_COCOA:
+
+    class OverlayController(NSObject):
+        """屏幕底部中间的悬浮提示条；只读 typer.status，不抢焦点。"""
+
+        def buildPanel(self):
+            scr = NSScreen.mainScreen().frame()
+            w, h = 240.0, 60.0
+            x = (scr.size.width - w) / 2.0
+            y = 150.0  # 距屏幕底部的高度
+            rect = NSMakeRect(x, y, w, h)
+            style = _NSWindowStyleMaskBorderless | _NSWindowStyleMaskNonactivatingPanel
+            panel = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                rect, style, NSBackingStoreBuffered, False
+            )
+            panel.setLevel_(NSStatusWindowLevel)          # 浮在所有窗口之上
+            panel.setOpaque_(False)
+            panel.setBackgroundColor_(NSColor.clearColor())
+            panel.setFloatingPanel_(True)
+            panel.setHidesOnDeactivate_(False)
+            panel.setIgnoresMouseEvents_(True)            # 鼠标点击穿透，不挡操作
+
+            content = panel.contentView()
+            content.setWantsLayer_(True)
+            layer = content.layer()
+            layer.setCornerRadius_(18.0)
+            layer.setBackgroundColor_(
+                NSColor.colorWithCalibratedRed_green_blue_alpha_(
+                    0.0, 0.0, 0.0, 0.82
+                ).CGColor()
+            )
+
+            label = NSTextField.alloc().initWithFrame_(
+                NSMakeRect(0, (h - 28) / 2.0, w, 28)
+            )
+            label.setBezeled_(False)
+            label.setDrawsBackground_(False)
+            label.setEditable_(False)
+            label.setSelectable_(False)
+            label.setAlignment_(NSTextAlignmentCenter)
+            label.setTextColor_(NSColor.whiteColor())
+            label.setFont_(NSFont.systemFontOfSize_(18.0))
+            content.addSubview_(label)
+
+            panel.orderOut_(None)  # 初始隐藏
+            self.panel = panel
+            self.label = label
+            self.last = None
+
+        def tick_(self, timer):
+            status = getattr(self.typer, "status", "idle")
+            if status == self.last:
+                return
+            self.last = status
+            if status == "recording":
+                self.label.setStringValue_(u"🔴  正在录音…")
+                self.panel.orderFrontRegardless()
+            elif status == "transcribing":
+                self.label.setStringValue_(u"✍️  识别中…")
+                self.panel.orderFrontRegardless()
+            else:
+                self.panel.orderOut_(None)
+
+
+def _run_overlay(typer):
+    import signal
+
+    # 让 Ctrl+C 能退出（Cocoa 跑起来后默认拦不住）
+    signal.signal(signal.SIGINT, lambda *a: os._exit(0))
+
+    app = NSApplication.sharedApplication()
+    app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)  # 不占程序坞图标
+
+    ctrl = OverlayController.alloc().init()
+    ctrl.typer = typer
+    ctrl.buildPanel()
+    NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+        0.1, ctrl, "tick:", None, True
+    )
+    app.run()
 
 
 def main():
+    typer = VoiceTyper()
+    listener = keyboard.Listener(
+        on_press=typer.on_press, on_release=typer.on_release
+    )
+    listener.start()
+
+    print("=" * 48)
+    print("  本地语音转文字已就绪")
+    print("  按一下「右 Option」开始录音，再按一下结束并识别")
+    print("  按 Ctrl+C 退出")
+    print("=" * 48)
+
+    if SHOW_OVERLAY and _HAVE_COCOA:
+        try:
+            _run_overlay(typer)  # 进入 Cocoa 主循环，显示浮动提示
+            return
+        except Exception as e:
+            print(f"浮动提示启动失败，已退回无窗口模式：{e}", file=sys.stderr)
+
     try:
-        VoiceTyper().run()
+        listener.join()
     except KeyboardInterrupt:
         print("\n已退出。")
 
