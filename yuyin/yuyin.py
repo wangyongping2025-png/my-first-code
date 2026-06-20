@@ -17,12 +17,14 @@
 import os
 import re
 import sys
+import json
 import time
 import wave
 import queue
 import tempfile
 import threading
 import subprocess
+import urllib.request
 
 # 模型托管在 Hugging Face，国内直连常不稳定/连不上。
 # 默认改走国内镜像 hf-mirror.com，避免「首次下载模型」卡住。
@@ -77,6 +79,29 @@ MAX_SEGMENT = 18.0
 
 # 一段最短多少秒才识别，太短的忽略（避免把咳嗽、杂音当成一句）。
 MIN_SEGMENT = 0.4
+
+# ===== 本地 AI 一键润色（用 Ollama，完全离线，不上网）=====
+# 开启后：说完按停，本地 AI 把整段原始文字重新加标点、分段、去口头禅，
+# 并自动替换掉刚才的草稿。Ollama 没装/没开时自动跳过润色、保留原始文字。
+POLISH = True
+
+# 本地 AI 模型（需先 `ollama pull` 下载）。8G 内存建议 qwen2.5:3b；
+# 内存宽裕可换 qwen2.5:7b（更聪明但更吃内存）。
+OLLAMA_MODEL = "qwen2.5:3b"
+OLLAMA_URL = "http://localhost:11434/api/generate"
+
+# 润色后是否自动「全选+替换」当前输入框内容。
+# True：草稿自动变成润色版（最像 Typeless），适合在空白笔记里口述。
+# False：只把润色结果放进剪贴板，你自己按 Cmd+V 替换（更安全）。
+POLISH_REPLACE = True
+
+# 给本地 AI 的指令（可按喜好微调）。
+POLISH_PROMPT = (
+    "下面是一段语音转写的原始文字，可能没有标点、有口头禅或重复。"
+    "请整理成通顺、带正确标点、合理分段的书面中文。"
+    "要求：保持原意，不要增删内容要点，不要做任何解释或评论，"
+    "只输出整理后的文字本身。\n\n原始文字：\n{text}\n\n整理后："
+)
 
 # 采样率，Whisper 用 16000。
 SAMPLE_RATE = 16000
@@ -162,6 +187,8 @@ class VoiceTyper:
         # 流式模式：录音数据进队列，由后台 worker 按停顿切段识别
         self._audio_q = queue.Queue()
         self._worker = None
+        # 本轮录音累积的原始文字，停止后交给本地 AI 润色
+        self._session_raw = []
         # 标记触发键当前是否处于按下状态，用来过滤长按时系统连发的重复事件
         self._last_toggle = 0.0
         # 当前状态："idle" 空闲 / "recording" 录音中 / "transcribing" 识别中
@@ -199,6 +226,7 @@ class VoiceTyper:
                 return
             self._recording = True
             self._frames = []
+            self._session_raw = []  # 新一轮，清空累积文字
             self._audio_q = queue.Queue()  # 新一轮，清空旧数据
             self._stream = sd.InputStream(
                 samplerate=SAMPLE_RATE,
@@ -304,6 +332,10 @@ class VoiceTyper:
             # 结束信号后，把剩下的最后一段也转了
             if has_speech and seg_samples > 0:
                 self._finalize_segment(seg, seg_samples)
+            # 全部识别完，整段交给本地 AI 润色
+            if POLISH:
+                self.status = "polishing"
+                self._do_polish()
         finally:
             self.status = "idle"
 
@@ -312,6 +344,64 @@ class VoiceTyper:
             return
         audio = np.concatenate(seg).astype(np.float32)
         self._transcribe_and_output(audio)
+
+    # ---------- 本地 AI 润色（Ollama，离线）----------
+
+    def _do_polish(self):
+        raw = "".join(self._session_raw).strip()
+        self._session_raw = []
+        if len(raw) < 4:  # 太短就不折腾 AI
+            return
+
+        print("✨  正在用本地 AI 润色…")
+        self._beep("Tink")
+        polished = self._call_ollama(raw)
+        if not polished:
+            print("（本地 AI 未启动或失败，已保留原始文字）")
+            return
+        if _t2s is not None:
+            polished = _t2s.convert(polished)  # 保险：统一简体
+
+        print(f"✨  润色后：{polished}")
+        self._beep("Glass")
+        if POLISH_REPLACE:
+            self._replace_all(polished)
+        else:
+            pyperclip.copy(polished)
+            print("（润色结果已复制，Cmd+V 可替换草稿）")
+
+    def _call_ollama(self, raw):
+        prompt = POLISH_PROMPT.format(text=raw)
+        payload = json.dumps(
+            {
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.3},
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+            return result.get("response", "").strip()
+        except Exception as e:
+            print(f"连接本地 AI 失败（Ollama 没装/没开？）：{e}", file=sys.stderr)
+            return ""
+
+    def _replace_all(self, text):
+        # 全选当前输入框内容，再粘贴润色版（适合在空白笔记里口述）
+        pyperclip.copy(text)
+        time.sleep(0.05)
+        with self._kb.pressed(keyboard.Key.cmd):
+            self._kb.press("a")
+            self._kb.release("a")
+        time.sleep(0.08)
+        with self._kb.pressed(keyboard.Key.cmd):
+            self._kb.press("v")
+            self._kb.release("v")
 
     def _save_debug_wav(self, audio):
         # float32(-1~1) 转 int16 写入 wav，仅供调试回放
@@ -355,6 +445,8 @@ class VoiceTyper:
         print(f"📝  {text}")
         if not STREAMING:
             self._beep("Glass")  # 批量模式：识别完成提示音
+        if STREAMING and POLISH:
+            self._session_raw.append(text)  # 攒着，停止后整段交给 AI 润色
         self._output(text)
 
     def _output(self, text):
@@ -475,6 +567,9 @@ if _HAVE_COCOA:
                 self.panel.orderFrontRegardless()
             elif status == "transcribing":
                 self.label.setStringValue_(u"✍️ 识别中…")
+                self.panel.orderFrontRegardless()
+            elif status == "polishing":
+                self.label.setStringValue_(u"✨ AI 润色中…")
                 self.panel.orderFrontRegardless()
             else:
                 self.panel.orderOut_(None)
