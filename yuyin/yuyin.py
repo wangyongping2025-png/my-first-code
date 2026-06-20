@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+本地语音转文字工具（macOS 版，第一版）
+
+用法：
+    按住 右 Option 键开始说话，松开后自动识别，
+    识别出的文字会自动「粘贴」到你当前光标所在的位置。
+
+特点：
+    - 完全离线：识别在本地完成，语音不联网、不外传。
+    - 音频不落盘：录音只存在内存里，识别完即丢弃。
+
+依赖见 requirements.txt，首次运行会下载一次模型文件（之后可彻底断网使用）。
+"""
+
+import sys
+import time
+import threading
+
+import numpy as np
+import sounddevice as sd
+import pyperclip
+from pynput import keyboard
+from faster_whisper import WhisperModel
+
+
+# ============ 配置区（这里可以按需修改） ============
+
+# 触发键：按住它说话，松开识别。
+# 默认用「右 Option」，避免和日常用左 Option 打字冲突。
+# 想换键可改成 keyboard.Key.alt_l（左 Option）、keyboard.Key.ctrl_r 等。
+TRIGGER_KEY = keyboard.Key.alt_r
+
+# 识别语言："zh" 中文；"en" 英文；None 自动检测。
+LANGUAGE = "zh"
+
+# 模型大小：tiny / base / small / medium / large-v3
+# medium：准确度和速度的平衡点，中文带标点，普通 Mac 可跑。
+MODEL_SIZE = "medium"
+
+# 计算精度。Apple Silicon / CPU 用 "int8" 兼容性最好、占用最低。
+COMPUTE_TYPE = "int8"
+
+# 采样率，Whisper 用 16000。
+SAMPLE_RATE = 16000
+
+# 识别完是否自动粘贴到光标处。False 则只放进剪贴板，你自己按 Cmd+V。
+AUTO_PASTE = True
+
+# ====================================================
+
+
+class VoiceTyper:
+    def __init__(self):
+        print(f"正在加载模型 {MODEL_SIZE}（首次会下载，请稍候）...")
+        self.model = WhisperModel(MODEL_SIZE, device="cpu", compute_type=COMPUTE_TYPE)
+        print("模型加载完成。")
+
+        self._recording = False
+        self._frames = []
+        self._stream = None
+        self._lock = threading.Lock()
+        self._kb = keyboard.Controller()
+
+    # ---------- 录音 ----------
+
+    def _audio_callback(self, indata, frames, time_info, status):
+        if status:
+            # 录音底层有警告时打印出来，但不中断
+            print(f"[录音警告] {status}", file=sys.stderr)
+        self._frames.append(indata.copy())
+
+    def start_recording(self):
+        with self._lock:
+            if self._recording:
+                return
+            self._recording = True
+            self._frames = []
+            self._stream = sd.InputStream(
+                samplerate=SAMPLE_RATE,
+                channels=1,
+                dtype="float32",
+                callback=self._audio_callback,
+            )
+            self._stream.start()
+            print("🎙️  正在录音...（松开按键结束）")
+
+    def stop_recording_and_transcribe(self):
+        with self._lock:
+            if not self._recording:
+                return
+            self._recording = False
+            self._stream.stop()
+            self._stream.close()
+            self._stream = None
+            frames = self._frames
+            self._frames = []
+
+        if not frames:
+            print("没有录到声音。")
+            return
+
+        audio = np.concatenate(frames, axis=0).flatten().astype(np.float32)
+        duration = len(audio) / SAMPLE_RATE
+        if duration < 0.3:
+            print("录音太短，已忽略。")
+            return
+
+        print(f"🧠  识别中...（{duration:.1f} 秒音频）")
+        self._transcribe(audio)
+
+    # ---------- 识别与输出 ----------
+
+    def _transcribe(self, audio):
+        try:
+            segments, _ = self.model.transcribe(
+                audio,
+                language=LANGUAGE,
+                beam_size=5,
+                vad_filter=True,  # 过滤静音，识别更干净
+            )
+            text = "".join(seg.text for seg in segments).strip()
+        except Exception as e:
+            print(f"识别出错：{e}", file=sys.stderr)
+            return
+
+        if not text:
+            print("没识别出内容。")
+            return
+
+        print(f"📝  {text}")
+        self._output(text)
+
+    def _output(self, text):
+        pyperclip.copy(text)
+        if not AUTO_PASTE:
+            print("（已复制到剪贴板，按 Cmd+V 粘贴）")
+            return
+        # 用剪贴板 + Cmd+V 输出，保证中文不乱码
+        time.sleep(0.05)
+        with self._kb.pressed(keyboard.Key.cmd):
+            self._kb.press("v")
+            self._kb.release("v")
+
+    # ---------- 快捷键监听 ----------
+
+    def on_press(self, key):
+        if key == TRIGGER_KEY:
+            self.start_recording()
+
+    def on_release(self, key):
+        if key == TRIGGER_KEY:
+            # 识别可能耗时，放到后台线程，避免卡住按键监听
+            threading.Thread(
+                target=self.stop_recording_and_transcribe, daemon=True
+            ).start()
+
+    def run(self):
+        key_name = str(TRIGGER_KEY).replace("Key.", "")
+        print("=" * 48)
+        print(f"  本地语音转文字已就绪")
+        print(f"  按住「{key_name}」说话，松开自动识别并输入")
+        print(f"  按 Ctrl+C 退出")
+        print("=" * 48)
+        with keyboard.Listener(
+            on_press=self.on_press, on_release=self.on_release
+        ) as listener:
+            listener.join()
+
+
+def main():
+    try:
+        VoiceTyper().run()
+    except KeyboardInterrupt:
+        print("\n已退出。")
+
+
+if __name__ == "__main__":
+    main()
