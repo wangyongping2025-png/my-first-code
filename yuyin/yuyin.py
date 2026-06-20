@@ -132,7 +132,7 @@ class VoiceTyper:
         self._lock = threading.Lock()
         self._kb = keyboard.Controller()
         # 标记触发键当前是否处于按下状态，用来过滤长按时系统连发的重复事件
-        self._key_down = False
+        self._last_toggle = 0.0
         # 当前状态："idle" 空闲 / "recording" 录音中 / "transcribing" 识别中
         # 浮动提示窗口靠读这个值来决定显示什么
         self.status = "idle"
@@ -272,10 +272,12 @@ class VoiceTyper:
             print(f"[按键] 你按下了：{key!r}")
         if key not in TRIGGER_KEYS:
             return
-        # 长按时系统会连发 on_press，这里只在「真正按下的那一下」响应
-        if self._key_down:
+        # 用「时间去抖」代替依赖松开事件：忽略 0.4 秒内的连发/重复按键。
+        # 这样即使某次「松开」事件丢失，也不会卡死在录音状态。
+        now = time.monotonic()
+        if now - self._last_toggle < 0.4:
             return
-        self._key_down = True
+        self._last_toggle = now
 
         if not self._recording:
             self.start_recording()
@@ -284,10 +286,6 @@ class VoiceTyper:
             threading.Thread(
                 target=self.stop_recording_and_transcribe, daemon=True
             ).start()
-
-    def on_release(self, key):
-        if key in TRIGGER_KEYS:
-            self._key_down = False
 
 # ============ 屏幕浮动提示（像 Typeless 的悬浮小条，用 macOS 原生窗口实现）============
 
@@ -399,9 +397,7 @@ def _run_overlay(typer):
 
 def main():
     typer = VoiceTyper()
-    listener = keyboard.Listener(
-        on_press=typer.on_press, on_release=typer.on_release
-    )
+    listener = keyboard.Listener(on_press=typer.on_press)
     listener.start()
 
     print("=" * 48)
