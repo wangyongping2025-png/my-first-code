@@ -4,7 +4,7 @@
 本地语音转文字工具（macOS 版，第一版）
 
 用法：
-    按住 右 Option 键开始说话，松开后自动识别，
+    按一下 右 Option 键开始录音，再按一下结束并识别，
     识别出的文字会自动「粘贴」到你当前光标所在的位置。
 
 特点：
@@ -27,7 +27,7 @@ from faster_whisper import WhisperModel
 
 # ============ 配置区（这里可以按需修改） ============
 
-# 触发键：按住它说话，松开识别。
+# 触发键：按一下开始录音，再按一下结束并识别（开关模式）。
 # 默认用「右 Option」，避免和日常用左 Option 打字冲突。
 # 想换键可改成 keyboard.Key.alt_l（左 Option）、keyboard.Key.ctrl_r 等。
 TRIGGER_KEY = keyboard.Key.alt_r
@@ -62,6 +62,8 @@ class VoiceTyper:
         self._stream = None
         self._lock = threading.Lock()
         self._kb = keyboard.Controller()
+        # 标记触发键当前是否处于按下状态，用来过滤长按时系统连发的重复事件
+        self._key_down = False
 
     # ---------- 录音 ----------
 
@@ -84,7 +86,7 @@ class VoiceTyper:
                 callback=self._audio_callback,
             )
             self._stream.start()
-            print("🎙️  正在录音...（松开按键结束）")
+            print("🎙️  正在录音...（再按一下结束）")
 
     def stop_recording_and_transcribe(self):
         with self._lock:
@@ -146,21 +148,30 @@ class VoiceTyper:
     # ---------- 快捷键监听 ----------
 
     def on_press(self, key):
-        if key == TRIGGER_KEY:
-            self.start_recording()
+        if key != TRIGGER_KEY:
+            return
+        # 长按时系统会连发 on_press，这里只在「真正按下的那一下」响应
+        if self._key_down:
+            return
+        self._key_down = True
 
-    def on_release(self, key):
-        if key == TRIGGER_KEY:
+        if not self._recording:
+            self.start_recording()
+        else:
             # 识别可能耗时，放到后台线程，避免卡住按键监听
             threading.Thread(
                 target=self.stop_recording_and_transcribe, daemon=True
             ).start()
 
+    def on_release(self, key):
+        if key == TRIGGER_KEY:
+            self._key_down = False
+
     def run(self):
         key_name = str(TRIGGER_KEY).replace("Key.", "")
         print("=" * 48)
         print(f"  本地语音转文字已就绪")
-        print(f"  按住「{key_name}」说话，松开自动识别并输入")
+        print(f"  按一下「{key_name}」开始录音，再按一下结束并识别")
         print(f"  按 Ctrl+C 退出")
         print("=" * 48)
         with keyboard.Listener(
