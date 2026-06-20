@@ -80,6 +80,13 @@ MAX_SEGMENT = 18.0
 # 一段最短多少秒才识别，太短的忽略（避免把咳嗽、杂音当成一句）。
 MIN_SEGMENT = 0.4
 
+# ===== 录音来源（把"电脑播放的视频/音频"转成文字时用）=====
+# None = 用默认麦克风（你自己对着说话）。
+# 想转写"电脑里播放的视频声音"：先装虚拟声卡 BlackHole，再把这里改成
+# "BlackHole"（写设备名的一部分即可，会自动匹配）。
+# 不确定有哪些设备？运行： python3 yuyin.py --devices  查看全部输入设备。
+INPUT_DEVICE = None
+
 # ===== 本地 AI 一键润色（用 Ollama，完全离线，不上网）=====
 # 开启后：说完按停，本地 AI 把整段原始文字重新加标点、分段、去口头禅，
 # 并自动替换掉刚才的草稿。Ollama 没装/没开时自动跳过润色、保留原始文字。
@@ -233,6 +240,7 @@ class VoiceTyper:
                 samplerate=SAMPLE_RATE,
                 channels=1,
                 dtype="float32",
+                device=INPUT_DEVICE,  # None=默认麦克风；填 "BlackHole" 转电脑内部声音
                 blocksize=int(SAMPLE_RATE * 0.1),  # 每 0.1 秒一块，便于判停顿
                 callback=self._audio_callback,
             )
@@ -594,13 +602,31 @@ def _run_overlay(typer):
     app.run()
 
 
+def _list_devices():
+    """打印所有能用来录音的输入设备，方便找 BlackHole 的名字。"""
+    print("可用的录音输入设备：\n")
+    for i, dev in enumerate(sd.query_devices()):
+        if dev["max_input_channels"] > 0:  # 只列能录音的
+            mark = "  ← 现在用这个" if (
+                INPUT_DEVICE is not None and str(INPUT_DEVICE).lower() in dev["name"].lower()
+            ) else ""
+            print(f"  [{i}] {dev['name']}（{dev['max_input_channels']} 声道）{mark}")
+    print("\n把要用的设备名（如 BlackHole）填到配置区 INPUT_DEVICE 即可。")
+
+
 def main():
+    if "--devices" in sys.argv:
+        _list_devices()
+        return
+
     typer = VoiceTyper()
     listener = keyboard.Listener(on_press=typer.on_press)
     listener.start()
 
+    src = "默认麦克风" if INPUT_DEVICE is None else f"「{INPUT_DEVICE}」"
     print("=" * 48)
     print("  本地语音转文字已就绪")
+    print(f"  录音来源：{src}")
     print("  按一下「右 Option」开始录音，再按一下结束并识别")
     print("  按 Ctrl+C 退出")
     print("=" * 48)
