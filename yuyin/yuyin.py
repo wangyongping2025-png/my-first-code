@@ -55,6 +55,10 @@ MODEL_SIZE = "medium"
 # 计算精度。Apple Silicon / CPU 用 "int8" 兼容性最好、占用最低。
 COMPUTE_TYPE = "int8"
 
+# 限制识别最多用几个 CPU 核：给系统和按键监听留余地，避免识别时整机卡顿。
+# 你的 Mac 是 8 核，这里留一半给系统。觉得识别太慢可调大（如 6）。
+CPU_THREADS = 4
+
 # 采样率，Whisper 用 16000。
 SAMPLE_RATE = 16000
 
@@ -123,7 +127,12 @@ def clean_text(text):
 class VoiceTyper:
     def __init__(self):
         print(f"正在加载模型 {MODEL_SIZE}（首次会下载，请稍候）...")
-        self.model = WhisperModel(MODEL_SIZE, device="cpu", compute_type=COMPUTE_TYPE)
+        self.model = WhisperModel(
+            MODEL_SIZE,
+            device="cpu",
+            compute_type=COMPUTE_TYPE,
+            cpu_threads=CPU_THREADS,
+        )
         print("模型加载完成。")
 
         self._recording = False
