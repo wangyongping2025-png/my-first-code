@@ -19,6 +19,7 @@ import re
 import sys
 import time
 import wave
+import queue
 import tempfile
 import threading
 import subprocess
@@ -58,6 +59,23 @@ COMPUTE_TYPE = "int8"
 # 限制识别最多用几个 CPU 核：给系统和按键监听留余地，避免识别时整机卡顿。
 # 你的 Mac 是 8 核，这里留一半给系统。觉得识别太慢可调大（如 6）。
 CPU_THREADS = 4
+
+# 流式识别：录音时按「停顿」把每句话即时转写并打出来（边录边出字）。
+# 这样长录音也不会在结尾卡顿，文字一句句流出来。
+STREAMING = True
+
+# 判定一段话结束的静音时长（秒）：说完一句自然停顿超过这个值就立刻出字。
+SILENCE_DURATION = 0.7
+
+# 静音判定阈值（音量 RMS 低于此值算静音）。不同麦克风灵敏度不同，可微调：
+#   出字太碎/太灵敏 → 调大（如 0.015）；半天不出字 → 调小（如 0.005）。
+SILENCE_RMS = 0.010
+
+# 一段最长多少秒就强制切一次，避免你长时间不停顿时积压（也防卡顿）。
+MAX_SEGMENT = 18.0
+
+# 一段最短多少秒才识别，太短的忽略（避免把咳嗽、杂音当成一句）。
+MIN_SEGMENT = 0.4
 
 # 采样率，Whisper 用 16000。
 SAMPLE_RATE = 16000
@@ -140,6 +158,9 @@ class VoiceTyper:
         self._stream = None
         self._lock = threading.Lock()
         self._kb = keyboard.Controller()
+        # 流式模式：录音数据进队列，由后台 worker 按停顿切段识别
+        self._audio_q = queue.Queue()
+        self._worker = None
         # 标记触发键当前是否处于按下状态，用来过滤长按时系统连发的重复事件
         self._last_toggle = 0.0
         # 当前状态："idle" 空闲 / "recording" 录音中 / "transcribing" 识别中
@@ -166,7 +187,10 @@ class VoiceTyper:
         if status:
             # 录音底层有警告时打印出来，但不中断
             print(f"[录音警告] {status}", file=sys.stderr)
-        self._frames.append(indata.copy())
+        if STREAMING:
+            self._audio_q.put(indata.copy())
+        else:
+            self._frames.append(indata.copy())
 
     def start_recording(self):
         with self._lock:
@@ -174,16 +198,23 @@ class VoiceTyper:
                 return
             self._recording = True
             self._frames = []
+            self._audio_q = queue.Queue()  # 新一轮，清空旧数据
             self._stream = sd.InputStream(
                 samplerate=SAMPLE_RATE,
                 channels=1,
                 dtype="float32",
+                blocksize=int(SAMPLE_RATE * 0.1),  # 每 0.1 秒一块，便于判停顿
                 callback=self._audio_callback,
             )
             self._stream.start()
             self.status = "recording"
             self._beep("Tink")  # 「叮」：开始录音
-            print("🎙️  正在录音...（再按一下结束）")
+            print("🎙️  正在录音…（边录边出字，再按一下结束）")
+            if STREAMING:
+                self._worker = threading.Thread(
+                    target=self._stream_worker, daemon=True
+                )
+                self._worker.start()
 
     def stop_recording_and_transcribe(self):
         with self._lock:
@@ -196,7 +227,14 @@ class VoiceTyper:
             frames = self._frames
             self._frames = []
 
-        self._beep("Pop")  # 「啵」：结束录音、开始识别
+        self._beep("Pop")  # 「啵」：结束录音
+
+        if STREAMING:
+            # 通知 worker 把最后一段收尾，状态由 worker 结束时置回 idle
+            self._audio_q.put(None)
+            return
+
+        # —— 批量模式（STREAMING=False 时走这里）——
         self.status = "transcribing"
         try:
             if not frames:
@@ -214,13 +252,63 @@ class VoiceTyper:
             # 调试模式：临时存个 wav 方便检查，识别完在 finally 里删掉
             debug_path = self._save_debug_wav(audio) if DEBUG_SAVE_AUDIO else None
             try:
-                self._transcribe(audio)
+                self._transcribe_and_output(audio)
             finally:
                 if debug_path and os.path.exists(debug_path):
                     os.remove(debug_path)
                     print(f"🧹  已删除临时音频：{debug_path}")
         finally:
             self.status = "idle"
+
+    def _stream_worker(self):
+        """后台：按停顿把录音切成一句句，逐句识别并即时打出来。"""
+        block_sec = 0.1
+        seg = []
+        seg_samples = 0
+        silence_blocks = 0
+        has_speech = False
+        try:
+            while True:
+                block = self._audio_q.get()
+                if block is None:  # 收到结束信号
+                    break
+                samples = block.flatten().astype(np.float32)
+                if samples.size == 0:
+                    continue
+                rms = float(np.sqrt(np.mean(samples * samples)))
+
+                if rms >= SILENCE_RMS:
+                    # 有声音：加入当前段
+                    seg.append(samples)
+                    seg_samples += samples.size
+                    has_speech = True
+                    silence_blocks = 0
+                elif has_speech:
+                    # 说过话之后的静音：累计，够久就切一段
+                    seg.append(samples)
+                    seg_samples += samples.size
+                    silence_blocks += 1
+                    if silence_blocks * block_sec >= SILENCE_DURATION:
+                        self._finalize_segment(seg, seg_samples)
+                        seg, seg_samples, has_speech, silence_blocks = [], 0, False, 0
+                # 说话前的静音：直接丢弃，不浪费算力
+
+                # 太长没停顿，强制切一段，避免积压卡顿
+                if has_speech and seg_samples / SAMPLE_RATE >= MAX_SEGMENT:
+                    self._finalize_segment(seg, seg_samples)
+                    seg, seg_samples, has_speech, silence_blocks = [], 0, False, 0
+
+            # 结束信号后，把剩下的最后一段也转了
+            if has_speech and seg_samples > 0:
+                self._finalize_segment(seg, seg_samples)
+        finally:
+            self.status = "idle"
+
+    def _finalize_segment(self, seg, seg_samples):
+        if seg_samples / SAMPLE_RATE < MIN_SEGMENT:
+            return
+        audio = np.concatenate(seg).astype(np.float32)
+        self._transcribe_and_output(audio)
 
     def _save_debug_wav(self, audio):
         # float32(-1~1) 转 int16 写入 wav，仅供调试回放
@@ -239,7 +327,7 @@ class VoiceTyper:
 
     # ---------- 识别与输出 ----------
 
-    def _transcribe(self, audio):
+    def _transcribe_and_output(self, audio):
         try:
             segments, _ = self.model.transcribe(
                 audio,
@@ -256,11 +344,14 @@ class VoiceTyper:
             text = clean_text(text)
 
         if not text:
-            print("没识别出内容。")
+            # 流式下一句句来，没内容就安静跳过，不刷屏
+            if not STREAMING:
+                print("没识别出内容。")
             return
 
         print(f"📝  {text}")
-        self._beep("Glass")  # 「叮咚」：识别完成、文字已输出
+        if not STREAMING:
+            self._beep("Glass")  # 批量模式：识别完成提示音
         self._output(text)
 
     def _output(self, text):
