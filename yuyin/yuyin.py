@@ -4,7 +4,7 @@
 本地语音转文字工具（macOS 版，第一版）
 
 用法：
-    按一下 右 Option 键开始录音，再按一下结束并识别，
+    按一下 Option 键（左右都行）开始录音，再按一下结束并识别，
     识别出的文字会自动「粘贴」到你当前光标所在的位置。
 
 特点：
@@ -28,9 +28,9 @@ from faster_whisper import WhisperModel
 # ============ 配置区（这里可以按需修改） ============
 
 # 触发键：按一下开始录音，再按一下结束并识别（开关模式）。
-# 默认用「右 Option」，避免和日常用左 Option 打字冲突。
-# 想换键可改成 keyboard.Key.alt_l（左 Option）、keyboard.Key.ctrl_r 等。
-TRIGGER_KEY = keyboard.Key.alt_r
+# 默认左、右 Option 都可触发。想限定只用一个，删掉集合里另一个即可；
+# 也可换成 keyboard.Key.ctrl_r 等其它键。
+TRIGGER_KEYS = {keyboard.Key.alt_l, keyboard.Key.alt_r}
 
 # 识别语言："zh" 中文；"en" 英文；None 自动检测。
 LANGUAGE = "zh"
@@ -148,7 +148,7 @@ class VoiceTyper:
     # ---------- 快捷键监听 ----------
 
     def on_press(self, key):
-        if key != TRIGGER_KEY:
+        if key not in TRIGGER_KEYS:
             return
         # 长按时系统会连发 on_press，这里只在「真正按下的那一下」响应
         if self._key_down:
@@ -164,14 +164,13 @@ class VoiceTyper:
             ).start()
 
     def on_release(self, key):
-        if key == TRIGGER_KEY:
+        if key in TRIGGER_KEYS:
             self._key_down = False
 
     def run(self):
-        key_name = str(TRIGGER_KEY).replace("Key.", "")
         print("=" * 48)
         print(f"  本地语音转文字已就绪")
-        print(f"  按一下「{key_name}」开始录音，再按一下结束并识别")
+        print(f"  按一下「左/右 Option」开始录音，再按一下结束并识别")
         print(f"  按 Ctrl+C 退出")
         print("=" * 48)
         with keyboard.Listener(
