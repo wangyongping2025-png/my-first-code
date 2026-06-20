@@ -83,7 +83,8 @@ MIN_SEGMENT = 0.4
 # ===== 本地 AI 一键润色（用 Ollama，完全离线，不上网）=====
 # 开启后：说完按停，本地 AI 把整段原始文字重新加标点、分段、去口头禅，
 # 并自动替换掉刚才的草稿。Ollama 没装/没开时自动跳过润色、保留原始文字。
-POLISH = True
+# 当前关闭：已卸载 Ollama，工具回到纯语音转文字。以后想用再装回 Ollama 并改 True。
+POLISH = False
 
 # 本地 AI 模型（需先 `ollama pull` 下载）。8G 内存建议 qwen2.5:3b；
 # 内存宽裕可换 qwen2.5:7b（更聪明但更吃内存）。
