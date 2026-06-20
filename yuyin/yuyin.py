@@ -65,6 +65,10 @@ AUTO_PASTE = True
 # 识别完成后自动删除；存放在临时目录，路径会打印在终端，方便你回放检查。
 DEBUG_SAVE_AUDIO = False
 
+# 调试开关：改成 True 后，按任意键都会在终端打印出来。
+# 用来排查「按键没反应」——能看到打印就说明监听正常，也能看清各键的真实名字。
+SHOW_KEYS = True
+
 # ====================================================
 
 
@@ -188,6 +192,8 @@ class VoiceTyper:
     # ---------- 快捷键监听 ----------
 
     def on_press(self, key):
+        if SHOW_KEYS:
+            print(f"[按键] 你按下了：{key!r}")
         if key not in TRIGGER_KEYS:
             return
         # 长按时系统会连发 on_press，这里只在「真正按下的那一下」响应
