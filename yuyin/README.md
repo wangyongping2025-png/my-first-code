@@ -52,7 +52,7 @@ source venv/bin/activate   # 如果刚打开新终端
 python3 yuyin.py
 ```
 
-首次运行会下载模型（medium 约 1.5GB），下完之后**可以彻底断网使用**。
+首次运行会下载模型（默认 small 约 0.5GB），下完之后**可以彻底断网使用**。
 
 看到「本地语音转文字已就绪」后：
 
@@ -71,9 +71,20 @@ python3 yuyin.py
 | 配置项 | 作用 |
 |--------|------|
 | `TRIGGER_KEYS` | 触发键集合，默认右 Option，可增删或换别的键 |
-| `MODEL_SIZE` | 模型大小，`small` 更快、`large-v3` 更准 |
+| `MODEL_SIZE` | 模型大小，默认 `small`（快而稳）；不够准再换 `medium` / `large-v3` |
 | `LANGUAGE` | `"zh"` 中文 / `"en"` 英文 / `None` 自动 |
 | `AUTO_PASTE` | `False` 则只复制到剪贴板，不自动粘贴 |
+| `DEBUG_SAVE_AUDIO` | 默认 `False`（音频绝不写盘）；排查问题时改 `True`，临时存 wav、识别完自动删 |
+
+### 如果右 Option 触发不灵
+
+不同 Mac、不同键盘对「右 Option」的识别偶尔不稳。若按了没反应，打开 `yuyin.py`
+把 `TRIGGER_KEYS` 那行换成下面任一个（实用第一）：
+
+```python
+TRIGGER_KEYS = {keyboard.Key.f9}                          # 改用 F9 单键
+TRIGGER_KEYS = {keyboard.Key.alt_l, keyboard.Key.alt_r}   # 左右 Option 都行
+```
 
 ---
 

@@ -14,8 +14,11 @@
 依赖见 requirements.txt，首次运行会下载一次模型文件（之后可彻底断网使用）。
 """
 
+import os
 import sys
 import time
+import wave
+import tempfile
 import threading
 
 import numpy as np
@@ -29,16 +32,19 @@ from faster_whisper import WhisperModel
 
 # 触发键：按一下开始录音，再按一下结束并识别（开关模式）。
 # 默认只用「右 Option」，这个键平时基本不用，不会和输入法切换、特殊符号冲突。
-# 想加左 Option 就改成 {keyboard.Key.alt_l, keyboard.Key.alt_r}；
-# 也可换成 keyboard.Key.ctrl_r 等其它键。
+#
+# 【备用方案】万一你的 Mac 上右 Option 触发不灵，换成下面任意一行即可（实用第一）：
+#   TRIGGER_KEYS = {keyboard.Key.f9}                       # 用 F9 单键
+#   TRIGGER_KEYS = {keyboard.Key.alt_l, keyboard.Key.alt_r}  # 左右 Option 都行
 TRIGGER_KEYS = {keyboard.Key.alt_r}
 
 # 识别语言："zh" 中文；"en" 英文；None 自动检测。
 LANGUAGE = "zh"
 
 # 模型大小：tiny / base / small / medium / large-v3
-# medium：准确度和速度的平衡点，中文带标点，普通 Mac 可跑。
-MODEL_SIZE = "medium"
+# 第一版用 small：在 8G 内存的 Mac 上又快又稳，中文够用。
+# 觉得不够准，再依次往上换 medium / large-v3（更准但更慢、更占内存）。
+MODEL_SIZE = "small"
 
 # 计算精度。Apple Silicon / CPU 用 "int8" 兼容性最好、占用最低。
 COMPUTE_TYPE = "int8"
@@ -48,6 +54,11 @@ SAMPLE_RATE = 16000
 
 # 识别完是否自动粘贴到光标处。False 则只放进剪贴板，你自己按 Cmd+V。
 AUTO_PASTE = True
+
+# 调试开关：默认 False，音频只在内存处理、绝不写盘（最安全）。
+# 排查「录音/识别有没有问题」时临时改成 True：会把每段录音存成 wav，
+# 识别完成后自动删除；存放在临时目录，路径会打印在终端，方便你回放检查。
+DEBUG_SAVE_AUDIO = False
 
 # ====================================================
 
@@ -111,7 +122,30 @@ class VoiceTyper:
             return
 
         print(f"🧠  识别中...（{duration:.1f} 秒音频）")
-        self._transcribe(audio)
+
+        # 调试模式：临时存个 wav 方便检查，识别完在 finally 里删掉
+        debug_path = self._save_debug_wav(audio) if DEBUG_SAVE_AUDIO else None
+        try:
+            self._transcribe(audio)
+        finally:
+            if debug_path and os.path.exists(debug_path):
+                os.remove(debug_path)
+                print(f"🧹  已删除临时音频：{debug_path}")
+
+    def _save_debug_wav(self, audio):
+        # float32(-1~1) 转 int16 写入 wav，仅供调试回放
+        path = os.path.join(
+            tempfile.gettempdir(), f"yuyin_debug_{int(time.time())}.wav"
+        )
+        pcm = np.clip(audio, -1.0, 1.0)
+        pcm = (pcm * 32767).astype(np.int16)
+        with wave.open(path, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(SAMPLE_RATE)
+            wf.writeframes(pcm.tobytes())
+        print(f"🐞  调试音频已存：{path}")
+        return path
 
     # ---------- 识别与输出 ----------
 
