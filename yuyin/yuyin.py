@@ -15,6 +15,7 @@
 """
 
 import os
+import re
 import sys
 import time
 import wave
@@ -48,9 +49,8 @@ TRIGGER_KEYS = {keyboard.Key.alt_r}
 LANGUAGE = "zh"
 
 # 模型大小：tiny / base / small / medium / large-v3
-# 第一版用 small：在 8G 内存的 Mac 上又快又稳，中文够用。
-# 觉得不够准，再依次往上换 medium / large-v3（更准但更慢、更占内存）。
-MODEL_SIZE = "small"
+# medium：标点和准确度比 small 明显更好，8G 内存可跑，每句慢 1~2 秒。
+MODEL_SIZE = "medium"
 
 # 计算精度。Apple Silicon / CPU 用 "int8" 兼容性最好、占用最低。
 COMPUTE_TYPE = "int8"
@@ -78,7 +78,46 @@ SOUND_FEEDBACK = True
 # 这样不用看终端就知道当前状态。
 SHOW_OVERLAY = True
 
+# 文本本地整理：繁体转简体、去口头禅、自动分点。完全离线，不上网。
+TEXT_CLEANUP = True
+
 # ====================================================
+
+
+# ============ 文本本地整理（纯离线，不上网）============
+
+# 繁体转简体：Whisper 有时会输出繁体字，这里统一转成简体。
+try:
+    from opencc import OpenCC
+
+    _t2s = OpenCC("t2s")
+except Exception:
+    _t2s = None
+
+# 要去掉的语气词（保守，只删明显无意义的，避免误删「金额」等真实词）
+_FILLER_WORDS = ["嗯", "呃", "唔"]
+
+
+def clean_text(text):
+    """对原始转写做本地整理：繁转简、去口头禅、合并重复词、自动分点。"""
+    if not text:
+        return text
+    s = text
+    # 1. 繁体 -> 简体
+    if _t2s is not None:
+        s = _t2s.convert(s)
+    # 2. 去掉语气词
+    for w in _FILLER_WORDS:
+        s = s.replace(w, "")
+    # 3. 合并紧挨着的重复词（那个那个 -> 那个）
+    s = re.sub(r"(那个|这个|就是)\1+", r"\1", s)
+    # 4. 「第X点/第X是…」「首先/其次/最后」前换行，自动分点
+    s = re.sub(r"\s*(第[一二三四五六七八九十]+(?:点|条|个|是))", r"\n\1", s)
+    s = re.sub(r"\s*(首先|其次|再者|最后|另外)([，,、])", r"\n\1\2", s)
+    # 5. 清理空白与多余换行
+    s = re.sub(r"[ \t]+", "", s)
+    s = re.sub(r"\n+", "\n", s).strip()
+    return s
 
 
 class VoiceTyper:
@@ -203,6 +242,9 @@ class VoiceTyper:
         except Exception as e:
             print(f"识别出错：{e}", file=sys.stderr)
             return
+
+        if TEXT_CLEANUP:
+            text = clean_text(text)
 
         if not text:
             print("没识别出内容。")
