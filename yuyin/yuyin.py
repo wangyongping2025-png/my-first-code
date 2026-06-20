@@ -21,6 +21,11 @@ import wave
 import tempfile
 import threading
 
+# 模型托管在 Hugging Face，国内直连常不稳定/连不上。
+# 默认改走国内镜像 hf-mirror.com，避免「首次下载模型」卡住。
+# 如果你能直连或人在国外，可删掉下面这行，或用环境变量 HF_ENDPOINT 覆盖。
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
 import numpy as np
 import sounddevice as sd
 import pyperclip
