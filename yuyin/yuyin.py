@@ -20,6 +20,7 @@ import time
 import wave
 import tempfile
 import threading
+import subprocess
 
 # 模型托管在 Hugging Face，国内直连常不稳定/连不上。
 # 默认改走国内镜像 hf-mirror.com，避免「首次下载模型」卡住。
@@ -69,6 +70,10 @@ DEBUG_SAVE_AUDIO = False
 # 用来排查「按键没反应」——能看到打印就说明监听正常，也能看清各键的真实名字。
 SHOW_KEYS = True
 
+# 声音提示：开始录音「叮」、结束录音「啵」、出字「叮咚」。
+# 这样不用盯着终端，在任何软件里靠声音就知道状态。
+SOUND_FEEDBACK = True
+
 # ====================================================
 
 
@@ -87,6 +92,20 @@ class VoiceTyper:
         self._key_down = False
 
     # ---------- 录音 ----------
+
+    def _beep(self, sound):
+        # 用 macOS 自带系统声音做提示，非阻塞播放
+        if not SOUND_FEEDBACK:
+            return
+        path = f"/System/Library/Sounds/{sound}.aiff"
+        try:
+            subprocess.Popen(
+                ["afplay", path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
 
     def _audio_callback(self, indata, frames, time_info, status):
         if status:
@@ -107,6 +126,7 @@ class VoiceTyper:
                 callback=self._audio_callback,
             )
             self._stream.start()
+            self._beep("Tink")  # 「叮」：开始录音
             print("🎙️  正在录音...（再按一下结束）")
 
     def stop_recording_and_transcribe(self):
@@ -119,6 +139,8 @@ class VoiceTyper:
             self._stream = None
             frames = self._frames
             self._frames = []
+
+        self._beep("Pop")  # 「啵」：结束录音、开始识别
 
         if not frames:
             print("没有录到声音。")
@@ -176,6 +198,7 @@ class VoiceTyper:
             return
 
         print(f"📝  {text}")
+        self._beep("Glass")  # 「叮咚」：识别完成、文字已输出
         self._output(text)
 
     def _output(self, text):
