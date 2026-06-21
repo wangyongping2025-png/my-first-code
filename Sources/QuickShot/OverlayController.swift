@@ -17,7 +17,11 @@ final class OverlayController {
         Capturer.captureAllDisplays { [weak self] shots in
             guard let self = self else { return }
             guard !shots.isEmpty else {
-                // Capture failed (likely permission). Bail cleanly.
+                // Capture produced nothing — almost always missing screen-
+                // recording permission. Guide to Settings, then bail cleanly.
+                if !Permissions.hasScreenRecording() {
+                    Permissions.openScreenRecordingSettings()
+                }
                 self.onFinish?()
                 return
             }

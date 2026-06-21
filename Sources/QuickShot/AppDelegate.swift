@@ -73,11 +73,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Already capturing? Ignore re-triggers.
         guard overlay == nil else { return }
 
-        guard Permissions.ensureScreenRecording() else {
-            Permissions.openScreenRecordingSettings()
-            return
-        }
-
+        // We intentionally do NOT gate on CGPreflightScreenCaptureAccess here:
+        // that check is unreliable for ad-hoc-signed apps (it can report "no
+        // access" even after the user granted it, sending us in circles to
+        // System Settings). The actual capture uses ScreenCaptureKit, which
+        // enforces its own permission. If capture comes back empty we guide the
+        // user to Settings from inside OverlayController.begin().
         let controller = OverlayController()
         controller.onFinish = { [weak self] in
             self?.overlay = nil   // release overlay + any retained images

@@ -36,10 +36,16 @@ enum AXElementFinder {
               AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success
         else { return nil }
 
+        // Use safe casts — some elements return values that are not AXValue, and
+        // a force-cast there would crash the whole app mid-capture.
+        guard let posRef = posValue, CFGetTypeID(posRef) == AXValueGetTypeID(),
+              let sizeRef = sizeValue, CFGetTypeID(sizeRef) == AXValueGetTypeID()
+        else { return nil }
+
         var point = CGPoint.zero
         var size = CGSize.zero
-        guard AXValueGetValue(posValue as! AXValue, .cgPoint, &point),
-              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
+        guard AXValueGetValue(posRef as! AXValue, .cgPoint, &point),
+              AXValueGetValue(sizeRef as! AXValue, .cgSize, &size)
         else { return nil }
 
         return CGRect(origin: point, size: size)
