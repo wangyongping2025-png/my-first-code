@@ -9,6 +9,7 @@ final class OverlayController {
     private var windows: [NSWindow] = []
     private var views: [OverlayView] = []
     private var previousActiveApp: NSRunningApplication?
+    private var finished = false
 
     func begin() {
         previousActiveApp = NSWorkspace.shared.frontmostApplication
@@ -31,6 +32,11 @@ final class OverlayController {
                                        backing: .buffered,
                                        defer: false)
             window.isOpaque = false
+            // Critical: we keep our own strong reference in `windows`. Letting
+            // AppKit also release the window on close() causes an over-release
+            // crash under ARC — which would kill the menu-bar app after the
+            // first capture. Manage the lifetime ourselves.
+            window.isReleasedWhenClosed = false
             window.backgroundColor = .clear
             window.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -67,7 +73,9 @@ final class OverlayController {
     }
 
     private func teardown() {
-        for window in windows { window.orderOut(nil); window.close() }
+        guard !finished else { return }   // never tear down twice
+        finished = true
+        for window in windows { window.orderOut(nil) }
         windows.removeAll()
         views.removeAll()                 // drops OverlayViews and their DisplayShots
         previousActiveApp?.activate()
