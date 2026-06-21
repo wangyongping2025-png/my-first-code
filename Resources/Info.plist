@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>QuickShot</string>
+    <key>CFBundleDisplayName</key>
+    <string>QuickShot</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.quickshot.app</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleExecutable</key>
+    <string>QuickShot</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <!-- Menu-bar-only app: no Dock icon, no main window. -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>QuickShot 需要屏幕录制权限来截取屏幕内容。</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>QuickShot 需要辅助功能权限来识别窗口与界面元素。</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>QuickShot — 本地截图工具,无云服务、无网络上传。</string>
+</dict>
+</plist>

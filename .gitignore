@@ -1,1 +1,7 @@
 jizhang.json
+
+# Swift build artifacts
+.build/
+QuickShot.app/
+*.xcodeproj
+.swiftpm/
